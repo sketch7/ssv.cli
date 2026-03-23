@@ -1,11 +1,21 @@
 {
   "name": "@ssv/cli",
   "version": "0.1.0",
+  "private": false,
   "description": "@ssv developer tooling CLI",
+  "license": "MIT",
+  "author": "Stephen Lautier <stephen.lautier@outlook.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sketch7/ssv.cli.git"
+  },
   "bin": {
     "ssv": "dist/cli.mjs"
   },
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsx watch src/cli.ts",
