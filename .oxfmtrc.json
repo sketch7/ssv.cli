@@ -4,11 +4,23 @@
   "semi": true,
   "singleQuote": false,
   "trailingComma": "all",
+  "arrowParens": "avoid",
+  "bracketSameLine": true,
+  "bracketSpacing": true,
   "printWidth": 140,
-  "ignorePatterns": ["dist/**", "node_modules/**"],
+  "ignorePatterns": [
+    "dist/**",
+    "coverage/**",
+    "*.lock",
+    "pnpm-lock.yaml"
+  ],
   "overrides": [
     {
-      "files": ["**/*.json", "**/*.jsonc", "**/*.md"],
+      "files": [
+        "**/*.json",
+        "**/*.jsonc",
+        "**/*.md"
+      ],
       "options": {
         "useTabs": false,
         "tabWidth": 2
