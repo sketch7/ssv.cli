@@ -1,10 +1,9 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { chdir, cwd, platform } from "node:process";
-
 import chalk from "chalk";
 import type { Command } from "commander";
 import { execa } from "execa";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { chdir, cwd, platform } from "node:process";
 import * as v from "valibot";
 
 import { MassCommandsConfigSchema } from "../config-schema.js";
@@ -140,7 +139,7 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 		try {
 			// Global commands (filtered by skipGlobalCommands)
 			const skipSet = new Set(repo.skipGlobalCommands ?? []);
-			const globalCmds = (config.globalCommands ?? []).filter((entry) => !skipSet.has(Object.keys(entry)[0]));
+			const globalCmds = (config.globalCommands ?? []).filter(entry => !skipSet.has(Object.keys(entry)[0]));
 
 			if (globalCmds.length) {
 				console.log(chalk.cyan("  Running global commands..."));

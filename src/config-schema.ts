@@ -2,7 +2,7 @@ import * as v from "valibot";
 
 const CommandEntrySchema = v.pipe(
 	v.record(v.string(), v.string()),
-	v.check((val) => Object.keys(val).length === 1, "Each command entry must have exactly one key"),
+	v.check(val => Object.keys(val).length === 1, "Each command entry must have exactly one key"),
 	v.description('A single-key record mapping a command name to a shell expression, e.g. { "git-pull": "git pull" }'),
 );
 
@@ -38,9 +38,7 @@ const MassCommandsConfigSchema = v.object({
 	vars: v.optional(
 		v.pipe(
 			v.record(v.string(), v.string()),
-			v.description(
-				"Generic string variables available for interpolation in URLs and commands. Also used as fallback for {{org}} via vars.org.",
-			),
+			v.description("Generic string variables available for interpolation in URLs and commands. Also used as fallback for {{org}} via vars.org."),
 		),
 	),
 	repos: v.pipe(v.array(RepoSchema), v.description("Repositories to process")),

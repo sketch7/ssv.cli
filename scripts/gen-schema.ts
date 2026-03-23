@@ -1,6 +1,7 @@
+import { toJsonSchema } from "@valibot/to-json-schema";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { toJsonSchema } from "@valibot/to-json-schema";
+
 import { MassCommandsConfigSchema } from "../src/config-schema.js";
 
 const schema = toJsonSchema(MassCommandsConfigSchema, {

@@ -7,20 +7,17 @@
   "arrowParens": "avoid",
   "bracketSameLine": true,
   "bracketSpacing": true,
-  "printWidth": 140,
-  "ignorePatterns": [
-    "dist/**",
-    "coverage/**",
-    "*.lock",
-    "pnpm-lock.yaml"
-  ],
+  "sortImports": {
+    "groups": [
+      ["side_effect", "builtin", "external"],
+      ["parent", "sibling", "index"]
+    ],
+    "newlinesBetween": true
+  },
+  "ignorePatterns": ["dist/**", "coverage/**", "*.lock", "pnpm-lock.yaml"],
   "overrides": [
     {
-      "files": [
-        "**/*.json",
-        "**/*.jsonc",
-        "**/*.md"
-      ],
+      "files": ["**/*.json", "**/*.jsonc", "**/*.md"],
       "options": {
         "useTabs": false,
         "tabWidth": 2

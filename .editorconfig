@@ -11,7 +11,7 @@ max_line_length = 150
 [*.{js,ts}]
 trim_trailing_whitespace = true
 spaces_around_operators = inside
-insert_final_newline = false
+insert_final_newline = true
 
 [package.json]
 insert_final_newline = true
@@ -20,7 +20,4 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 indent_size = 2
 indent_style = space
-
-[*.{js,ts}]
-trim_trailing_whitespace = true
-spaces_around_operators = inside
+insert_final_newline = true
