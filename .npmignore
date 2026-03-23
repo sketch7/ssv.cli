@@ -1,0 +1,10 @@
+.github
+/docs
+/.vscode
+*.tgz
+*_spec*
+
+eslint.config.mjs
+.editorconfig
+tsconfig.*
+CODEOWNERS

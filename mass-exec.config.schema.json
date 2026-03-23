@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "clonePrefix": {
+      "type": "string",
+      "description": "Prefix prepended to the local clone folder name, e.g. \"@ssv\" or \"sketch7\""
+    },
+    "shell": {
+      "type": "string",
+      "description": "Shell to use for executing commands, e.g. \"powershell\", \"bash\", \"sh\""
+    },
+    "org": {
+      "type": "string",
+      "description": "Config-level org — used as {{org}} fallback when repo.org is not set"
+    },
+    "repoUrlTemplate": {
+      "type": "string",
+      "description": "Default URL template for cloning repos when repo.url is not set. Supports interpolation: {{repo.name}}, {{org}}, {{projectName}}, and any vars. e.g. \"https://github.com/{{org}}/{{repo.name}}.git\""
+    },
+    "vars": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Generic string variables available for interpolation in URLs and commands. Also used as fallback for {{org}} via vars.org."
+    },
+    "repos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Repository name, e.g. \"ssv-core\""
+          },
+          "url": {
+            "type": "string",
+            "description": "Git clone URL. Supports interpolation: {{repo.name}}, {{org}}, {{projectName}}, and any vars. Overrides config-level repoUrlTemplate."
+          },
+          "org": {
+            "type": "string",
+            "description": "Per-repo org override — used for {{org}} interpolation"
+          },
+          "clonePrefix": {
+            "type": "string",
+            "description": "Per-repo clone prefix override (overrides config-level clonePrefix)"
+          },
+          "commands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "A single-key record mapping a command name to a shell expression, e.g. { \"git-pull\": \"git pull\" }"
+            },
+            "description": "Commands specific to this repo, run after global commands"
+          },
+          "skipGlobalCommands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Keys of globalCommands entries to skip for this repo"
+          }
+        },
+        "required": ["name"]
+      },
+      "description": "Repositories to process"
+    },
+    "globalCommands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        },
+        "description": "A single-key record mapping a command name to a shell expression, e.g. { \"git-pull\": \"git pull\" }"
+      },
+      "description": "Commands run for every repo (filtered by skipGlobalCommands per repo)"
+    }
+  },
+  "required": ["repos"]
+}
