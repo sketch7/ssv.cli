@@ -1,7 +1,7 @@
 {
   "name": "@ssv/toolz",
   "version": "0.1.0",
-  "description": "SSV developer tooling CLI",
+  "description": "@ssv developer tooling CLI",
   "bin": {
     "ssv-toolz": "dist/cli.mjs"
   },
