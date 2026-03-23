@@ -24,7 +24,7 @@ const RepoSchema = v.object({
 
 const MassCommandsConfigSchema = v.object({
 	$schema: v.optional(v.string()),
-	clonePrefix: v.optional(v.pipe(v.string(), v.description('Prefix prepended to the local clone folder name, e.g. "@ssv." or "sketch7."'))),
+	clonePrefix: v.optional(v.pipe(v.string(), v.description('Prefix prepended to the local clone folder name, e.g. "@ssv" or "sketch7"'))),
 	shell: v.optional(v.pipe(v.string(), v.description('Shell to use for executing commands, e.g. "powershell", "bash", "sh"'))),
 	org: v.optional(v.pipe(v.string(), v.description("Config-level org — used as {{org}} fallback when repo.org is not set"))),
 	repoUrlTemplate: v.optional(

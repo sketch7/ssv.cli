@@ -4,7 +4,7 @@ SSV developer tooling CLI.
 
 ## Requirements
 
-- Node.js `>=24.14.0`
+- Node.js `>=24`
 - pnpm
 
 ## Installation
@@ -71,10 +71,10 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
 
 ```jsonc
 {
-  "$schema": "../../powershell/git-mass-commands/git-mass-commands.schema.json",
+  "$schema": "node_modules/@ssv/toolz/mass-exec.config.schema.json",
 
   // Optional: prepended to the local clone folder name
-  "clonePrefix": "@ssv.",
+  "clonePrefix": "@ssv",
 
   // Optional: default shell for this config (overridden by --shell flag)
   "shell": "powershell",
@@ -95,7 +95,7 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
       "url": "https://github.com/{{org}}/{{repo.name}}.git",
 
       // Optional: override clonePrefix for this repo only
-      "clonePrefix": "@ssv.",
+      "clonePrefix": "@ssv",
 
       // Optional: override org for this repo only
       "org": "sketch7",
@@ -146,20 +146,29 @@ pnpm install
 # Build (outputs to dist/)
 pnpm build
 
+# Run compiled CLI
+pnpm start
+
 # Watch mode (runs via tsx, no build step)
 pnpm dev -- mass-exec --help
 
 # Type-check
 pnpm typecheck
 
-# Lint (oxlint + ESLint)
+# Lint
 pnpm lint
 
 # Lint with auto-fix
 pnpm lint:fix
 
-# Format (oxc formatter)
+# Format
 pnpm format
+
+# Check formatting without modifying
+pnpm format:check
+
+# Regenerate mass-exec.config.schema.json (run after editing src/config-schema.ts)
+pnpm gen-schema
 ```
 
 ### Re-link after rebuilding

@@ -7,7 +7,7 @@
     },
     "clonePrefix": {
       "type": "string",
-      "description": "Prefix prepended to the local clone folder name, e.g. \"@ssv.\" or \"sketch7.\""
+      "description": "Prefix prepended to the local clone folder name, e.g. \"@ssv\" or \"sketch7\""
     },
     "shell": {
       "type": "string",

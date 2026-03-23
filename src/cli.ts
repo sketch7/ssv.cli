@@ -12,7 +12,9 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf8
 
 const program = new Command();
 
-program.name("ssv-toolz").description("SSV developer tooling CLI").version(pkg.version, "-v, --version");
+program.name("ssv-toolz")
+	.description("@ssv developer tooling CLI")
+	.version(pkg.version, "-v, --version");
 
 registerMassExecCommand(program);
 
