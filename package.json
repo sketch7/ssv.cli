@@ -1,9 +1,9 @@
 {
-  "name": "@ssv/toolz",
+  "name": "@ssv/cli",
   "version": "0.1.0",
   "description": "@ssv developer tooling CLI",
   "bin": {
-    "ssv-toolz": "dist/cli.mjs"
+    "ssv": "dist/cli.mjs"
   },
   "type": "module",
   "scripts": {

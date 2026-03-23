@@ -1,4 +1,4 @@
-# @ssv/toolz — Copilot Instructions
+# @ssv/cli — Copilot Instructions
 
 @ssv developer tooling CLI. Currently ships one command: `mass-exec`, a Node.js replacement for the PowerShell `git-mass-commands.ps1` script that clones multiple git repos and runs global + per-repo shell commands.
 

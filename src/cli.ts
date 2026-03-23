@@ -12,7 +12,7 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf8
 
 const program = new Command();
 
-program.name("ssv-toolz")
+program.name("ssv")
 	.description("@ssv developer tooling CLI")
 	.version(pkg.version, "-v, --version");
 

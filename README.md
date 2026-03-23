@@ -1,4 +1,4 @@
-# @ssv/toolz
+# @ssv/cli
 
 @ssv developer tooling CLI.
 
@@ -12,7 +12,7 @@
 ### Global (recommended)
 
 ```bash
-pnpm add -g @ssv/toolz
+pnpm add -g @ssv/cli
 # or link from source after building:
 pnpm build && pnpm link --global
 ```
@@ -20,7 +20,7 @@ pnpm build && pnpm link --global
 ### Local project
 
 ```bash
-pnpm add -D @ssv/toolz
+pnpm add -D @ssv/cli
 ```
 
 ---
@@ -32,7 +32,7 @@ pnpm add -D @ssv/toolz
 Clone a set of git repositories and run commands against each one — global commands (shared across all repos) and per-repo commands. A Node.js replacement for the PowerShell `git-mass-commands.ps1` script.
 
 ```
-ssv-toolz mass-exec [options]
+ssv mass-exec [options]
 ```
 
 | Option            | Alias | Description                                                                                    | Default                               |
@@ -46,21 +46,21 @@ ssv-toolz mass-exec [options]
 
 ```bash
 # Single config, dry-run to preview
-ssv-toolz mass-exec -c ../../powershell/git-mass-commands/ssv/ssv.arcane.config.json -r S:/toolz-test --dry-run
-ssv-toolz mass-exec -c ./mass-exec-cfgs/ssv.tools.config.json -r S:/toolz-test --dry-run
+ssv mass-exec -c ../../powershell/git-mass-commands/ssv/ssv.arcane.config.json -r S:/toolz-test --dry-run
+ssv mass-exec -c ./mass-exec-cfgs/ssv.tools.config.json -r S:/toolz-test --dry-run
 
 # Clone + run with a specific shell
-ssv-toolz mass-exec -c ./ssv/ssv.core.config.json -r S:/git --shell bash
+ssv mass-exec -c ./ssv/ssv.core.config.json -r S:/git --shell bash
 
 # Process multiple configs in sequence (replaces @ssv.all.ps1)
-ssv-toolz mass-exec \
+ssv mass-exec \
   -c ./ssv/ssv.core.config.json \
   -c ./ssv/ssv.arcane.config.json \
   -c ./ssv/ssv.ngx-apps.config.json \
   -r S:/git
 
 # Configs live next to the repos root
-ssv-toolz mass-exec -c /path/to/configs/my.config.json -r ./workspace
+ssv mass-exec -c /path/to/configs/my.config.json -r ./workspace
 ```
 
 ---
@@ -71,7 +71,7 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
 
 ```jsonc
 {
-  "$schema": "node_modules/@ssv/toolz/mass-exec.config.schema.json",
+  "$schema": "node_modules/@ssv/cli/mass-exec.config.schema.json",
 
   // Optional: prepended to the local clone folder name
   "clonePrefix": "@ssv",
