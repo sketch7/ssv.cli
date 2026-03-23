@@ -1,6 +1,6 @@
 # @ssv/toolz
 
-SSV developer tooling CLI.
+@ssv developer tooling CLI.
 
 ## Requirements
 
@@ -82,6 +82,9 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
   // Optional: default org for {{org}} interpolation
   "org": "sketch7",
 
+  // Optional: default URL template for all repos (used when repo.url is not set)
+  "repoUrlTemplate": "https://github.com/{{org}}/{{repo.name}}.git",
+
   // Optional: arbitrary variables available in URL and command interpolation
   "vars": {
     "baseUrl": "https://github.com",
@@ -91,7 +94,7 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
     {
       "name": "ssv-core",
 
-      // URL supports interpolation tokens (see below)
+      // Optional: overrides config-level repoUrlTemplate for this repo
       "url": "https://github.com/{{org}}/{{repo.name}}.git",
 
       // Optional: override clonePrefix for this repo only
@@ -107,8 +110,8 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
       "skipGlobalCommands": ["git-cleanup-branches"],
     },
     {
+      // url omitted — repoUrlTemplate is used automatically
       "name": "ssv-tools",
-      "url": "https://github.com/{{org}}/{{repo.name}}.git",
     },
   ],
 
