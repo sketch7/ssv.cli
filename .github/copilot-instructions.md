@@ -13,8 +13,8 @@ pnpm start            # Run compiled CLI
 pnpm typecheck        # tsc --noEmit
 pnpm lint             # oxlint .
 pnpm lint:fix         # oxlint --fix .
-pnpm format           # oxfmt .
-pnpm format:check     # oxfmt . --check
+pnpm fmt           # oxfmt .
+pnpm fmt:check     # oxfmt . --check
 
 pnpm gen-schema       # Regenerate mass-exec.config.schema.json from config-schema.ts
 ```

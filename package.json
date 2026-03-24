@@ -23,8 +23,8 @@
     "gen-schema": "tsx scripts/gen-schema.ts",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
-    "format": "oxfmt .",
-    "format:check": "oxfmt . --check",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt . --check",
     "typecheck": "tsc --noEmit",
     "__CI__": "",
     "release": "npm publish"

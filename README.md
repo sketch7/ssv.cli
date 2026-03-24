@@ -317,10 +317,10 @@ pnpm lint
 pnpm lint:fix
 
 # Format
-pnpm format
+pnpm fmt
 
 # Check formatting without modifying
-pnpm format:check
+pnpm fmt:check
 
 # Regenerate mass-exec.config.schema.json (run after editing src/config-schema.ts)
 pnpm gen-schema
