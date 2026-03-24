@@ -3,18 +3,19 @@ import { consola } from "consola";
 import { colors } from "consola/utils";
 import { execa } from "execa";
 import { Listr } from "listr2";
-import type { DefaultRenderer, ListrTaskWrapper, SimpleRenderer } from "listr2";
+import type { DefaultRenderer, ListrTask, ListrTaskWrapper, SimpleRenderer } from "listr2";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { platform } from "node:process";
 import { createInterface } from "node:readline/promises";
 import * as v from "valibot";
+import { parse as parseYaml } from "yaml";
 
 import type { ConfigEntry } from "../config-discovery.js";
 import { discoverConfigs, resolveNames } from "../config-discovery.js";
 import { MassCommandsConfigSchema } from "../config-schema.js";
-import type { CommandEntry, CommandEntryObject, MassCommandsConfig, ProjectConfig } from "../config-schema.js";
+import type { MassCommandsConfig, ProjectConfig, Step } from "../config-schema.js";
 import { buildVars, interpolate } from "../interpolate.js";
 import type { SsvSettings } from "../settings.js";
 import { getSettingsPath, readSettings, writeSettings } from "../settings.js";
@@ -143,86 +144,51 @@ function resolveBaseRoot(cliRoot?: string, globalWsRoot?: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Normalized command types
+// Normalized step types
 // ---------------------------------------------------------------------------
 
-interface NormalizedCommand {
+interface NormalizedStep {
 	name: string;
 	run: string;
 	needs: string[];
+	parallel: boolean;
 }
 
-/** Convert either schema shape to a uniform NormalizedCommand. */
-function normalizeCommand(entry: CommandEntry): NormalizedCommand {
-	if (typeof entry === "object" && "run" in entry) {
-		const obj = entry as CommandEntryObject;
-		return { name: obj.name, run: obj.run, needs: obj.needs ?? [] };
-	}
-	// Shorthand: single-key record
-	const [name, run] = Object.entries(entry)[0];
-	return { name, run, needs: [] };
+function normalizeStep(step: Step): NormalizedStep {
+	return { name: step.name, run: step.run, needs: step.needs ?? [], parallel: step.parallel ?? false };
 }
 
 /**
- * Build execution waves via Kahn's topological sort.
- * Sequential mode: one command per wave, preserving insertion order.
- * Parallel mode: group all commands whose deps are satisfied into one wave.
- *
- * Throws if a cycle is detected (lists the cycle chain).
+ * Build execution waves based on step position and the `parallel` flag.
+ * Consecutive steps with `parallel: true` are grouped into one wave and run concurrently.
+ * Non-parallel steps form singleton waves and run sequentially.
+ * `needs` references are validated — warns on unknown names.
  */
-function buildCommandWaves(commands: NormalizedCommand[], parallel: boolean): NormalizedCommand[][] {
-	const byName = new Map<string, NormalizedCommand>(commands.map(c => [c.name, c]));
-
-	// Validate that all `needs` references actually exist
-	for (const cmd of commands) {
-		for (const dep of cmd.needs) {
-			if (!byName.has(dep)) {
-				consola.warn(`Command "${cmd.name}" needs unknown command "${dep}" — skipping dependency`);
+function buildStepWaves(steps: NormalizedStep[]): NormalizedStep[][] {
+	const names = new Set(steps.map(s => s.name));
+	for (const step of steps) {
+		for (const dep of step.needs) {
+			if (!names.has(dep)) {
+				consola.warn(`Step "${step.name}" needs unknown step "${dep}" — skipping dependency`);
 			}
 		}
 	}
 
-	// Kahn's algorithm
-	const inDegree = new Map<string, number>(commands.map(c => [c.name, 0]));
-	const adjReverse = new Map<string, string[]>(commands.map(c => [c.name, []]));
-
-	for (const cmd of commands) {
-		for (const dep of cmd.needs) {
-			if (byName.has(dep)) {
-				inDegree.set(cmd.name, (inDegree.get(cmd.name) ?? 0) + 1);
-				adjReverse.get(dep)!.push(cmd.name);
+	const waves: NormalizedStep[][] = [];
+	let i = 0;
+	while (i < steps.length) {
+		if (steps[i].parallel) {
+			const wave: NormalizedStep[] = [];
+			while (i < steps.length && steps[i].parallel) {
+				wave.push(steps[i]);
+				i++;
 			}
+			waves.push(wave);
+		} else {
+			waves.push([steps[i]]);
+			i++;
 		}
 	}
-
-	// Queue: commands with no remaining dependencies
-	const queue: NormalizedCommand[] = commands.filter(c => inDegree.get(c.name) === 0);
-	const waves: NormalizedCommand[][] = [];
-	let processed = 0;
-
-	while (queue.length > 0) {
-		const wave = parallel ? [...queue.splice(0)] : [queue.shift()!];
-		waves.push(wave);
-		processed += wave.length;
-
-		for (const cmd of wave) {
-			for (const dependent of adjReverse.get(cmd.name) ?? []) {
-				const newDegree = (inDegree.get(dependent) ?? 0) - 1;
-				inDegree.set(dependent, newDegree);
-				if (newDegree === 0) {
-					const depCmd = byName.get(dependent);
-					if (depCmd) queue.push(depCmd);
-				}
-			}
-		}
-	}
-
-	if (processed < commands.length) {
-		const cycleNodes = commands.filter(c => (inDegree.get(c.name) ?? 0) > 0).map(c => c.name);
-		consola.fatal(`Circular dependency detected in commands: ${cycleNodes.join(" → ")}`);
-		process.exit(1);
-	}
-
 	return waves;
 }
 
@@ -250,7 +216,7 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 
 		let raw: unknown;
 		try {
-			raw = JSON.parse(readFileSync(entry.filePath, "utf8"));
+			raw = parseYaml(readFileSync(entry.filePath, "utf8"));
 		} catch (err) {
 			consola.error(`Failed to parse config: ${entry.filePath}`);
 			consola.error(String(err));
@@ -298,14 +264,56 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 // Listr2-based project runner
 // ---------------------------------------------------------------------------
 
+type Ctx = Record<string, never>;
+
+/**
+ * Convert a list of waves into listr2 task definitions.
+ * Single-step waves render as a plain task; multi-step waves render as a nested concurrent group.
+ */
+function buildWaveTasks(
+	waves: NormalizedStep[][],
+	shell: string,
+	dryRun: boolean,
+	localPath: string,
+): ListrTask<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>[] {
+	const tasks: ListrTask<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>[] = [];
+	for (const wave of waves) {
+		if (wave.length === 1) {
+			const step = wave[0];
+			tasks.push({
+				title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
+				task: async (_c, stepTask) => {
+					stepTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
+					if (!dryRun) await runCommand(shell, step.run, localPath);
+				},
+			});
+		} else {
+			// Parallel wave — nested concurrent listr
+			tasks.push({
+				title: wave.map(s => colors.dim(`[${s.name}]`)).join(" "),
+				task: (_c, waveTask) =>
+					waveTask.newListr(
+						wave.map(step => ({
+							title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
+							task: async (_c2: Ctx, stepTask: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
+								stepTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
+								if (!dryRun) await runCommand(shell, step.run, localPath);
+							},
+						})),
+						{ concurrent: true, exitOnError: true },
+					),
+			});
+		}
+	}
+	return tasks;
+}
+
 /** Detect if we are in a non-interactive / CI environment. */
 function isVerboseRenderer(): boolean {
 	return (consola.level ?? 3) >= 4;
 }
 
 async function setupAll(config: MassCommandsConfig, rootPath: string, shell: string, dryRun: boolean, concurrency: number): Promise<void> {
-	type Ctx = Record<string, never>;
-
 	const projectTasks = config.projects.map((project: ProjectConfig) => ({
 		title: project.name,
 		task: (_ctx: Ctx, task: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
@@ -318,7 +326,6 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 			const prefix = project.clonePrefix ?? config.clonePrefix ?? "";
 			const localName = prefix ? `${prefix.replace(/\.+$/, "")}.${project.name.replace(/^\.+/, "")}` : project.name;
 			const localPath = resolve(rootPath, localName);
-			const parallelCmds = project.parallelCommands ?? config.parallelCommands ?? false;
 
 			return task.newListr(
 				[
@@ -347,66 +354,37 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 						title: "Verify directory",
 						skip: () => dryRun || existsSync(localPath),
 						task: (_, subTask) => {
-							subTask.skip(`Directory '${localName}' does not exist — skipping commands`);
+							subTask.skip(`Directory '${localName}' does not exist — skipping steps`);
 						},
 					},
-					// ---- Global commands ----
+					// ---- Global steps ----
 					{
-						title: "Global commands",
+						title: "Global steps",
 						skip: () => {
-							const skipSet = new Set(project.skipGlobalCommands ?? []);
-							const globalCmds = (config.globalCommands ?? []).filter(e => {
-								const name = normalizeCommand(e).name;
-								return !skipSet.has(name);
-							});
-							return globalCmds.length === 0 ? "No global commands" : false;
+							const skipSet = new Set(project.skipGlobalSteps ?? []);
+							const globalSteps = (config.globalSteps ?? []).filter(s => !skipSet.has(s.name));
+							return globalSteps.length === 0 ? "No global steps" : false;
 						},
 						task: async (_ctx2, subTask) => {
-							const skipSet = new Set(project.skipGlobalCommands ?? []);
-							const globalCmds = (config.globalCommands ?? [])
-								.map(normalizeCommand)
-								.filter(c => !skipSet.has(c.name))
-								.map(c => ({ ...c, run: interpolate(c.run, projectVars) }));
+							const skipSet = new Set(project.skipGlobalSteps ?? []);
+							const globalSteps = (config.globalSteps ?? [])
+								.map(normalizeStep)
+								.filter(s => !skipSet.has(s.name))
+								.map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
 
-							const waves = buildCommandWaves(globalCmds, parallelCmds);
-							return subTask.newListr(
-								waves.flatMap(wave =>
-									wave.map(cmd => ({
-										title: `${colors.dim(`[${cmd.name}]`)} ${colors.white(cmd.run)}`,
-										task: async (_ctx3, cmdTask) => {
-											cmdTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd.run)}` : colors.dim(cmd.run);
-											if (!dryRun) {
-												await runCommand(shell, cmd.run, localPath);
-											}
-										},
-									})),
-								),
-								{ concurrent: parallelCmds, exitOnError: true },
-							);
+							const waves = buildStepWaves(globalSteps);
+							return subTask.newListr(buildWaveTasks(waves, shell, dryRun, localPath), { concurrent: false, exitOnError: true });
 						},
 					},
-					// ---- Project commands ----
+					// ---- Project steps ----
 					{
-						title: "Project commands",
-						skip: () => (!project.commands?.length ? "No project commands" : false),
+						title: "Project steps",
+						skip: () => (!project.steps?.length ? "No project steps" : false),
 						task: async (_, subTask) => {
-							const cmds = (project.commands ?? []).map(normalizeCommand).map(c => ({ ...c, run: interpolate(c.run, projectVars) }));
+							const steps = (project.steps ?? []).map(normalizeStep).map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
 
-							const waves = buildCommandWaves(cmds, parallelCmds);
-							return subTask.newListr(
-								waves.flatMap(wave =>
-									wave.map(cmd => ({
-										title: `${colors.dim(`[${cmd.name}]`)} ${colors.white(cmd.run)}`,
-										task: async (_ctx3, cmdTask) => {
-											cmdTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd.run)}` : colors.dim(cmd.run);
-											if (!dryRun) {
-												await runCommand(shell, cmd.run, localPath);
-											}
-										},
-									})),
-								),
-								{ concurrent: parallelCmds, exitOnError: true },
-							);
+							const waves = buildStepWaves(steps);
+							return subTask.newListr(buildWaveTasks(waves, shell, dryRun, localPath), { concurrent: false, exitOnError: true });
 						},
 					},
 				],

@@ -34,10 +34,6 @@
       "minimum": 1,
       "description": "Number of projects to run concurrently. Overridden by CLI --concurrency flag. Default: 5"
     },
-    "parallelCommands": {
-      "type": "boolean",
-      "description": "Run commands (globalCommands and project commands) concurrently within each project. Waves are determined by `needs` dependencies. Default: false (sequential)"
-    },
     "projects": {
       "type": "array",
       "items": {
@@ -62,79 +58,63 @@
             "additionalProperties": { "type": "string" },
             "description": "Per-project variable overrides — merged over config-level vars for this project only"
           },
-          "commands": {
+          "steps": {
             "type": "array",
             "items": {
-              "anyOf": [
-                {
-                  "type": "object",
-                  "propertyNames": { "type": "string" },
-                  "additionalProperties": { "type": "string" },
-                  "description": "A single-key record mapping a command name to a shell expression, e.g. { \"git-pull\": \"git pull\" }"
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "description": "Step identifier" },
+                "run": {
+                  "type": "string",
+                  "description": "Shell expression to execute. Supports interpolation tokens."
                 },
-                {
-                  "type": "object",
-                  "properties": {
-                    "name": { "type": "string", "description": "Command identifier" },
-                    "run": {
-                      "type": "string",
-                      "description": "Shell expression to execute. Supports interpolation tokens."
-                    },
-                    "needs": {
-                      "type": "array",
-                      "items": { "type": "string" },
-                      "description": "Names of commands that must complete before this one runs (within the same context)"
-                    }
-                  },
-                  "required": ["name", "run"]
+                "needs": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Names of steps that must complete before this one runs (informational — used for validation and documentation)"
+                },
+                "parallel": {
+                  "type": "boolean",
+                  "description": "When true, this step is grouped with adjacent parallel steps and runs concurrently with them"
                 }
-              ]
+              },
+              "required": ["name", "run"]
             },
-            "description": "Commands specific to this project, run after global commands"
+            "description": "Steps specific to this project, run after global steps"
           },
-          "skipGlobalCommands": {
+          "skipGlobalSteps": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Keys of globalCommands entries to skip for this project"
-          },
-          "parallelCommands": {
-            "type": "boolean",
-            "description": "Run commands concurrently for this project. Overrides config-level parallelCommands. Default: false"
+            "description": "Names of globalSteps entries to skip for this project"
           }
         },
         "required": ["name"]
       },
       "description": "Projects to process"
     },
-    "globalCommands": {
+    "globalSteps": {
       "type": "array",
       "items": {
-        "anyOf": [
-          {
-            "type": "object",
-            "propertyNames": { "type": "string" },
-            "additionalProperties": { "type": "string" },
-            "description": "A single-key record mapping a command name to a shell expression, e.g. { \"git-pull\": \"git pull\" }"
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Step identifier" },
+          "run": {
+            "type": "string",
+            "description": "Shell expression to execute. Supports interpolation tokens."
           },
-          {
-            "type": "object",
-            "properties": {
-              "name": { "type": "string", "description": "Command identifier" },
-              "run": {
-                "type": "string",
-                "description": "Shell expression to execute. Supports interpolation tokens."
-              },
-              "needs": {
-                "type": "array",
-                "items": { "type": "string" },
-                "description": "Names of commands that must complete before this one runs (within the same context)"
-              }
-            },
-            "required": ["name", "run"]
+          "needs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Names of steps that must complete before this one runs (informational — used for validation and documentation)"
+          },
+          "parallel": {
+            "type": "boolean",
+            "description": "When true, this step is grouped with adjacent parallel steps and runs concurrently with them"
           }
-        ]
+        },
+        "required": ["name", "run"]
       },
-      "description": "Commands run for every project (filtered by skipGlobalCommands per project)"
+      "description": "Steps run for every project (filtered by skipGlobalSteps per project)"
     }
   },
   "required": ["projects"]

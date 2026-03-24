@@ -2,6 +2,8 @@ import type { Dirent } from "node:fs";
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 
+const YAML_EXTS = [".yaml", ".yml"] as const;
+
 export interface ConfigEntry {
 	name: string;
 	filePath: string;
@@ -17,7 +19,7 @@ export function discoverConfigs(dir: string): ConfigEntry[] {
 
 	return entries
 		.filter(e => {
-			if (!e.isFile() || !e.name.endsWith(".json")) return false;
+			if (!e.isFile() || !YAML_EXTS.some(ext => e.name.endsWith(ext))) return false;
 			// Exclude common non-config directories
 			const rel = relative(dir, join(e.parentPath, e.name)).replace(/\\/g, "/");
 			return !rel.split("/").some(seg => seg === "node_modules" || seg === ".git");
@@ -26,7 +28,7 @@ export function discoverConfigs(dir: string): ConfigEntry[] {
 			const filePath = join(e.parentPath, e.name);
 			const raw = relative(dir, filePath)
 				.replace(/\\/g, "/")
-				.replace(/\.json$/, "");
+				.replace(/\.(yaml|yml)$/, "");
 			const name = trimRedundantSegmentPrefix(raw);
 			return { name, filePath };
 		})

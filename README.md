@@ -76,13 +76,13 @@ List all config files discovered in the registered directory.
 ssv mass-exec list
 ```
 
-Config names are derived from their path relative to the registered directory, without the `.json` extension. If the filename begins with the parent directory name followed by a dot, that redundant prefix is trimmed:
+Config names are derived from their path relative to the registered directory, without the `.yaml` / `.yml` extension. If the filename begins with the parent directory name followed by a dot, that redundant prefix is trimmed:
 
 | File path (relative) | Config name  |
 | -------------------- | ------------ |
-| `ssv/ssv.tools.json` | `ssv/tools`  |
-| `bssn/bssn.fe.json`  | `bssn/fe`    |
-| `ssv/arcane.json`    | `ssv/arcane` |
+| `ssv/ssv.tools.yaml` | `ssv/tools`  |
+| `bssn/bssn.fe.yaml`  | `bssn/fe`    |
+| `ssv/arcane.yaml`    | `ssv/arcane` |
 
 ---
 
@@ -159,123 +159,115 @@ ssv mass-exec ssv --dry-run --log-level debug
 
 ## Config file format
 
-Fully backward-compatible with the original PowerShell `*.config.json` schema.
+Config files are **YAML** (`.yaml` or `.yml`). Point your editor at the JSON Schema for completions and validation:
 
-```jsonc
-{
-  "$schema": "node_modules/@ssv/cli/mass-exec.config.schema.json",
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/sketch7/ssv.cli/refs/heads/main/mass-exec.config.schema.json
+$schema: "https://raw.githubusercontent.com/sketch7/ssv.cli/refs/heads/main/mass-exec.config.schema.json"
 
-  // Optional: per-config workspace root (projects for this config are cloned here)
-  // Supports {wsRoot} token — resolves to the global ws-root setting
-  "wsRoot": "{wsRoot}/bssn",
+# Optional: per-config workspace root (projects for this config are cloned here)
+# Supports {wsRoot} token — resolves to the global ws-root setting
+wsRoot: "{wsRoot}/bssn"
 
-  // Optional: prepended to the local clone folder name
-  "clonePrefix": "@ssv",
+# Optional: prepended to the local clone folder name
+clonePrefix: "@ssv"
 
-  // Optional: default shell for this config (overridden by --shell flag)
-  "shell": "powershell",
+# Optional: default shell for this config (overridden by --shell flag)
+shell: powershell
 
-  // Optional: default org for {org} interpolation
-  "org": "sketch7",
+# Optional: default org for {org} interpolation
+org: sketch7
 
-  // Optional: default URL template for all projects (used when project.url is not set)
-  "cloneUrlTemplate": "https://github.com/{org}/{projectName}.git",
+# Optional: default URL template for all projects (used when project.url is not set)
+cloneUrlTemplate: "https://github.com/{org}/{projectName}.git"
 
-  // Optional: arbitrary variables available in URL and command interpolation
-  "vars": {
-    "baseUrl": "https://github.com",
-    "defaultBranch": "main",
-  },
+# Optional: arbitrary variables available in URL and step interpolation
+vars:
+  baseUrl: "https://github.com"
+  defaultBranch: main
 
-  // Optional: number of projects to run concurrently (overridden by --concurrency flag). Default: 5
-  "concurrency": 3,
+# Optional: number of projects to run concurrently (overridden by --concurrency flag). Default: 5
+concurrency: 3
 
-  // Optional: run globalCommands and project commands concurrently within each project.
-  // When true, commands with no `needs` dependencies run in parallel.
-  // Default: false (sequential)
-  "parallelCommands": false,
+projects:
+  - name: ssv-core
+    # Optional: overrides config-level cloneUrlTemplate for this project
+    url: "https://github.com/{org}/{projectName}.git"
+    # Optional: override clonePrefix for this project only
+    clonePrefix: "@ssv"
+    # Optional: override org for this project only
+    org: sketch7
+    # Optional: steps run after globalSteps for this project
+    steps:
+      - name: npm-install
+        run: npm install
+      - name: build
+        run: npm run build
+        needs: [npm-install]
+    # Optional: skip specific globalSteps for this project
+    skipGlobalSteps:
+      - git-cleanup-branches
 
-  "projects": [
-    {
-      "name": "ssv-core",
+  # url omitted — cloneUrlTemplate is used automatically
+  - name: ssv-tools
 
-      // Optional: overrides config-level cloneUrlTemplate for this project
-      "url": "https://github.com/{org}/{projectName}.git",
+  - name: legacy-project
+    # Optional: override config-level vars for this project only
+    vars:
+      defaultBranch: master
 
-      // Optional: override clonePrefix for this project only
-      "clonePrefix": "@ssv",
+  - name: app
+    # Steps with parallel grouping and needs-based ordering:
+    steps:
+      - name: restore
+        run: npm install
+      - name: lint
+        run: npm run lint
+        parallel: true
+      - name: test
+        run: npm test
+        parallel: true
+      - name: build
+        run: npm run build
+        needs: [restore]
 
-      // Optional: override org for this project only
-      "org": "sketch7",
-
-      // Optional: override parallelCommands for this project only
-      "parallelCommands": true,
-
-      // Optional: commands run after globalCommands for this project.
-      // Shorthand form (backward-compatible):
-      "commands": [{ "npm-install": "npm install" }, { "build": "npm run build" }],
-
-      // Optional: skip specific globalCommands for this project
-      "skipGlobalCommands": ["git-cleanup-branches"],
-    },
-    {
-      // url omitted — cloneUrlTemplate is used automatically
-      "name": "ssv-tools",
-    },
-    {
-      "name": "legacy-project",
-
-      // Optional: override config-level vars for this project only
-      "vars": {
-        "defaultBranch": "master",
-      },
-    },
-    {
-      "name": "app",
-      // Rich command form with `needs` for dependency ordering:
-      "commands": [
-        { "name": "install", "run": "npm install" },
-        { "name": "build", "run": "npm run build", "needs": ["install"] },
-        { "name": "test", "run": "npm test", "needs": ["build"] },
-        // lint can run in parallel with test (both depend only on build)
-        { "name": "lint", "run": "npm run lint", "needs": ["build"] },
-      ],
-    },
-  ],
-
-  // Optional: run for every project (skippable per project via skipGlobalCommands)
-  "globalCommands": [
-    { "git-checkout": "git checkout {defaultBranch}" },
-    { "git-pull": "git pull" },
-    { "git-fetch-prune": "git fetch --prune origin" },
-    { "git-cleanup-branches": "git branch -vv | grep ': gone]' | awk '{print $1}' | xargs git branch -D" },
-  ],
-}
+# Optional: run for every project (skippable per project via skipGlobalSteps)
+globalSteps:
+  - name: git-checkout
+    run: "git checkout {defaultBranch}"
+  - name: git-pull
+    run: git pull
+  - name: git-fetch-prune
+    run: git fetch --prune origin
+  - name: git-cleanup-branches
+    run: "git branch -vv | grep ': gone]' | awk '{print $1}' | xargs git branch -D"
 ```
 
-### Command formats
+### Step format
 
-Both `globalCommands` and `commands` accept two formats that can be mixed:
+Both `globalSteps` and `steps` use the same object shape:
 
-**Shorthand** — backward-compatible single-key record:
-
-```jsonc
-{ "git-pull": "git pull" }
+```yaml
+globalSteps:
+  - name: restore
+    run: pnpm install
+  - name: lint
+    run: pnpm lint
+    parallel: true # grouped with adjacent parallel steps → run concurrently
+  - name: typecheck
+    run: pnpm typecheck
+    parallel: true # same wave as lint
+  - name: build
+    run: pnpm build
+    needs: [restore] # informational — documents intent
 ```
 
-**Rich object** — enables `needs` for dependency ordering:
-
-```jsonc
-{ "name": "build", "run": "npm run build", "needs": ["install"] }
-```
-
-| Field   | Required | Description                                              |
-| ------- | -------- | -------------------------------------------------------- |
-| `name`  | ✓        | Command identifier (used in `needs` and progress output) |
-| `run`   | ✓        | Shell expression. Supports interpolation tokens.         |
-| `needs` |          | Names of commands that must complete before this one.    |
-
-When `parallelCommands: true`, commands whose `needs` are already satisfied run concurrently within the same wave. Circular dependencies are detected at runtime and reported as a fatal error.
+| Field      | Required | Description                                                                                                    |
+| ---------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `name`     | ✓        | Step identifier (used in `skipGlobalSteps`, `needs`, and progress output)                                      |
+| `run`      | ✓        | Shell expression. Supports interpolation tokens.                                                               |
+| `needs`    |          | Names of steps this step conceptually depends on (informational / documented).                                 |
+| `parallel` |          | When `true`, groups this step with adjacent `parallel: true` steps into one concurrent wave. Default: `false`. |
 
 ### Interpolation tokens
 
