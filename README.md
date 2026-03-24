@@ -35,15 +35,31 @@ Clone a set of git repositories and run commands against each one — global com
 ssv mass-exec <subcommand>
 ```
 
-#### `mass-exec set <path>`
+#### `mass-exec set <key> <value>`
 
-Register the directory that contains your mass-exec config files. Only needs to be run once per machine.
+Persist a setting. Available keys:
+
+| Key           | Description                                         |
+| ------------- | --------------------------------------------------- |
+| `config-root` | Directory scanned for mass-exec config files        |
+| `ws-root`     | Global workspace root — default dir for repo clones |
 
 ```bash
-ssv mass-exec set S:/git/sketch7.resource/mass-exec
+ssv mass-exec set config-root S:/git/sketch7.resource/mass-exec
+ssv mass-exec set ws-root S:/git
 ```
 
-The path is persisted to `~/.ssv/config.json`.
+Settings are persisted to `~/.ssv/config.json`.
+
+---
+
+#### `mass-exec setup`
+
+Interactive wizard to configure `ws-root` and `config-root` in one step. Prefills current values as defaults.
+
+```bash
+ssv mass-exec setup
+```
 
 ---
 
@@ -73,12 +89,12 @@ Run one or more configs by name. `run` is the default subcommand and can be omit
 ssv mass-exec [run] <names...> [options]
 ```
 
-| Option            | Alias | Description                                                                                    | Default                               |
-| ----------------- | ----- | ---------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `--repo <filter>` |       | Only process repos whose name contains this string (case-insensitive substring match).         |                                       |
-| `--root <path>`   | `-r`  | Root directory where repositories are cloned into. Created automatically if it does not exist. | `./`                                  |
-| `--shell <shell>` | `-s`  | Shell used to execute commands (`powershell`, `pwsh`, `bash`, `sh`, …).                        | `powershell` on Windows, `sh` on Unix |
-| `--dry-run`       | `-d`  | Print all commands with their working directory without executing anything.                    | `false`                               |
+| Option            | Alias | Description                                                                                                                  | Default                               |
+| ----------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `--repo <filter>` |       | Only process repos whose name contains this string (case-insensitive substring match).                                       |                                       |
+| `--root <path>`   | `-r`  | Override root directory where repositories are cloned. When omitted, uses the global `ws-root` setting (or `./` if not set). |                                       |
+| `--shell <shell>` | `-s`  | Shell used to execute commands (`powershell`, `pwsh`, `bash`, `sh`, …).                                                      | `powershell` on Windows, `sh` on Unix |
+| `--dry-run`       | `-d`  | Print all commands with their working directory without executing anything.                                                  | `false`                               |
 
 **Name resolution:**
 
@@ -92,8 +108,12 @@ ssv mass-exec [run] <names...> [options]
 #### Examples
 
 ```bash
-# Register config directory once
-ssv mass-exec set S:/git/sketch7.resource/mass-exec
+# Register config directory and workspace root
+ssv mass-exec set config-root S:/git/sketch7.resource/mass-exec
+ssv mass-exec set ws-root S:/git
+
+# Or configure both interactively
+ssv mass-exec setup
 
 # List all available configs
 ssv mass-exec list
@@ -116,6 +136,9 @@ ssv mass-exec all
 # Run all ssv/* configs into a custom root, dry-run
 ssv mass-exec ssv -r S:/git --dry-run
 
+# Run bssn configs — wsRoot resolved from global ws-root setting
+ssv mass-exec bssn
+
 # Override shell
 ssv mass-exec ssv/tools --shell bash
 ```
@@ -129,6 +152,10 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
 ```jsonc
 {
   "$schema": "node_modules/@ssv/cli/mass-exec.config.schema.json",
+
+  // Optional: per-config workspace root (repos for this config are cloned here)
+  // Supports {{wsRoot}} token — resolves to the global ws-root setting
+  "wsRoot": "{{wsRoot}}/bssn",
 
   // Optional: prepended to the local clone folder name
   "clonePrefix": "@ssv",
@@ -186,12 +213,13 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
 
 Available in **both** `url` and command strings:
 
-| Token             | Resolves to                                          |
-| ----------------- | ---------------------------------------------------- |
-| `{{repo.name}}`   | Repository name (e.g. `ssv-core`)                    |
-| `{{projectName}}` | Alias for `{{repo.name}}`                            |
-| `{{org}}`         | `repo.org` → `config.org` → `config.vars.org` → `""` |
-| `{{anyKey}}`      | Any key defined in `config.vars`                     |
+| Token             | Resolves to                                                |
+| ----------------- | ---------------------------------------------------------- |
+| `{{repo.name}}`   | Repository name (e.g. `ssv-core`)                          |
+| `{{projectName}}` | Alias for `{{repo.name}}`                                  |
+| `{{org}}`         | `repo.org` → `config.org` → `config.vars.org` → `""`       |
+| `{{wsRoot}}`      | Global ws-root setting (used in per-config `wsRoot` field) |
+| `{{anyKey}}`      | Any key defined in `config.vars`                           |
 
 Unknown tokens are left as-is (e.g. `{{unknown}}` stays `{{unknown}}`).
 

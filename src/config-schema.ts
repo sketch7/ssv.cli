@@ -41,6 +41,14 @@ const MassCommandsConfigSchema = v.object({
 			v.description("Generic string variables available for interpolation in URLs and commands. Also used as fallback for {{org}} via vars.org."),
 		),
 	),
+	wsRoot: v.optional(
+		v.pipe(
+			v.string(),
+			v.description(
+				'Per-config workspace root. Supports {{wsRoot}} token resolved from the global ws-root setting, e.g. "{{wsRoot}}/bssn"',
+			),
+		),
+	),
 	repos: v.pipe(v.array(RepoSchema), v.description("Repositories to process")),
 	globalCommands: v.optional(
 		v.pipe(v.array(CommandEntrySchema), v.description("Commands run for every repo (filtered by skipGlobalCommands per repo)")),
