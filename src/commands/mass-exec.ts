@@ -11,7 +11,7 @@ import * as v from "valibot";
 import type { ConfigEntry } from "../config-discovery.js";
 import { discoverConfigs, resolveNames } from "../config-discovery.js";
 import { MassCommandsConfigSchema } from "../config-schema.js";
-import type { CommandEntry, MassCommandsConfig } from "../config-schema.js";
+import type { CommandEntry, MassCommandsConfig, ProjectConfig } from "../config-schema.js";
 import { buildVars, interpolate } from "../interpolate.js";
 import type { SsvSettings } from "../settings.js";
 import { getSettingsPath, readSettings, writeSettings } from "../settings.js";
@@ -20,7 +20,7 @@ const SET_KEYS = ["config-root", "ws-root"] as const;
 type SetKey = (typeof SET_KEYS)[number];
 
 interface RunOptions {
-	repo?: string;
+	project?: string;
 	root?: string;
 	shell?: string;
 	dryRun: boolean;
@@ -106,7 +106,7 @@ export function registerMassExecCommand(program: Command): void {
 		new Command("run")
 			.description("Run one or more mass-exec config(s) by name, prefix, or 'all'")
 			.argument("<names...>", "Config name(s): exact (ssv/tools), prefix (ssv), or 'all'")
-			.option("--repo <filter>", "Only run repos whose name contains this string (case-insensitive)")
+			.option("--project <filter>", "Only run projects whose name contains this string (case-insensitive)")
 			.option("-r, --root <path>", "Override root path where repos are cloned (ignores ws-root setting)")
 			.option("-s, --shell <shell>", "Shell to use for command execution (e.g. powershell, bash)")
 			.option("-d, --dry-run", "Print commands without executing them", false)
@@ -181,17 +181,17 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 			process.exit(1);
 		}
 
-		if (opts.repo) {
-			const filter = opts.repo.toLowerCase();
-			config = { ...config, repos: config.repos.filter(r => r.name.toLowerCase().includes(filter)) };
-			if (!config.repos.length) {
-				console.warn(chalk.yellow(`  --repo filter "${opts.repo}" matched no repos — skipping config`));
+		if (opts.project) {
+			const filter = opts.project.toLowerCase();
+			config = { ...config, projects: config.projects.filter(r => r.name.toLowerCase().includes(filter)) };
+			if (!config.projects.length) {
+				console.warn(chalk.yellow(`  --project filter "${opts.project}" matched no projects — skipping config`));
 				continue;
 			}
 		}
 
 		const resolvedShell = resolveShell(opts.shell, config.shell);
-		// Per-config wsRoot override (supports {{wsRoot}} token pointing to the global setting)
+		// Per-config wsRoot override (supports {wsRoot} token pointing to the global setting)
 		const rootPath = config.wsRoot ? resolve(interpolate(config.wsRoot, { wsRoot: baseRoot })) : baseRoot;
 		await setupAll(config, rootPath, resolvedShell, opts.dryRun);
 	}
@@ -202,31 +202,31 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 }
 
 async function setupAll(config: MassCommandsConfig, rootPath: string, shell: string, dryRun: boolean): Promise<void> {
-	const total = config.repos.length;
+	const total = config.projects.length;
 
 	for (let i = 0; i < total; i++) {
-		const repo = config.repos[i];
+		const project: ProjectConfig = config.projects[i];
 
 		console.log();
-		console.log(chalk.magenta(`  [${i + 1}/${total}] ${repo.name}`));
+		console.log(chalk.magenta(`  [${i + 1}/${total}] ${project.name}`));
 		console.log();
 
-		if (!repo.name) {
-			console.warn(chalk.yellow("  Repo has an empty name — skipping"));
+		if (!project.name) {
+			console.warn(chalk.yellow("  Project has an empty name — skipping"));
 			continue;
 		}
 
-		const repoVars = buildVars(config, repo);
-		const prefix = repo.clonePrefix ?? config.clonePrefix ?? "";
-		const localName = prefix ? `${prefix.replace(/\.+$/, "")}.${repo.name.replace(/^\.+/, "")}` : repo.name;
+		const projectVars = buildVars(config, project);
+		const prefix = project.clonePrefix ?? config.clonePrefix ?? "";
+		const localName = prefix ? `${prefix.replace(/\.+$/, "")}.${project.name.replace(/^\.+/, "")}` : project.name;
 		const localPath = resolve(rootPath, localName);
 
 		// Clone if not already present
-		const urlTemplate = repo.url ?? config.repoUrlTemplate;
+		const urlTemplate = project.url ?? config.cloneUrlTemplate;
 		if (urlTemplate) {
-			const url = interpolate(urlTemplate, repoVars);
+			const url = interpolate(urlTemplate, projectVars);
 			if (!existsSync(localPath)) {
-				console.log(chalk.cyan("  Cloning repo..."));
+				console.log(chalk.cyan("  Cloning project..."));
 				await runCommand(shell, `git clone ${url} ${localName}`, dryRun, rootPath);
 			} else {
 				console.warn(chalk.yellow("  Already cloned — skipping clone"));
@@ -245,18 +245,18 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 
 		try {
 			// Global commands (filtered by skipGlobalCommands)
-			const skipSet = new Set(repo.skipGlobalCommands ?? []);
+			const skipSet = new Set(project.skipGlobalCommands ?? []);
 			const globalCmds = (config.globalCommands ?? []).filter(entry => !skipSet.has(Object.keys(entry)[0]));
 
 			if (globalCmds.length) {
 				console.log(chalk.cyan("  Running global commands..."));
-				await executeCommands(globalCmds, repoVars, shell, dryRun, dryRun ? localPath : undefined);
+				await executeCommands(globalCmds, projectVars, shell, dryRun, dryRun ? localPath : undefined);
 			}
 
-			// Repo-specific commands
-			if (repo.commands?.length) {
-				console.log(chalk.cyan("  Running repo commands..."));
-				await executeCommands(repo.commands, repoVars, shell, dryRun, dryRun ? localPath : undefined);
+			// Project-specific commands
+			if (project.commands?.length) {
+				console.log(chalk.cyan("  Running project commands..."));
+				await executeCommands(project.commands, projectVars, shell, dryRun, dryRun ? localPath : undefined);
 			}
 		} finally {
 			if (!dryRun) {

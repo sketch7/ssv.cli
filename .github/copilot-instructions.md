@@ -27,14 +27,14 @@ pnpm gen-schema       # Regenerate mass-exec.config.schema.json from config-sche
 src/
   cli.ts                  Entry point — Commander setup, registers all commands
   config-schema.ts        Valibot schemas + inferred TypeScript types
-  interpolate.ts          {{token}} interpolation utilities
+  interpolate.ts          {token} interpolation utilities
   commands/
     mass-exec.ts          mass-exec command logic (clone, run, dry-run)
 scripts/
   gen-schema.ts           Converts Valibot schemas → JSON Schema (auto-generated output)
 ```
 
-**Data flow:** `cli.ts` → registers `mass-exec` → reads + validates config files via Valibot → uses `interpolate.ts` to resolve `{{tokens}}` in URLs and commands → executes via `execa`.
+**Data flow:** `cli.ts` → registers `mass-exec` → reads + validates config files via Valibot → uses `interpolate.ts` to resolve `{tokens}` in URLs and commands → executes via `execa`.
 
 ## Key Conventions
 
@@ -93,11 +93,10 @@ scripts/
 
 Available in `url` and command strings in config files:
 
-| Token             | Resolves to                                          |
-| ----------------- | ---------------------------------------------------- |
-| `{{repo.name}}`   | Repository name                                      |
-| `{{projectName}}` | Alias for `{{repo.name}}`                            |
-| `{{org}}`         | `repo.org` → `config.org` → `config.vars.org` → `""` |
-| `{{anyKey}}`      | Any key in `config.vars`                             |
+| Token           | Resolves to                                             |
+| --------------- | ------------------------------------------------------- |
+| `{projectName}` | Project name                                            |
+| `{org}`         | `project.org` → `config.org` → `config.vars.org` → `""` |
+| `{anyKey}`      | Any key in `config.vars`                                |
 
 Unknown tokens are left as-is.
