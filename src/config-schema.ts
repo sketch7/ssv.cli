@@ -44,9 +44,7 @@ const MassCommandsConfigSchema = v.object({
 	wsRoot: v.optional(
 		v.pipe(
 			v.string(),
-			v.description(
-				'Per-config workspace root. Supports {{wsRoot}} token resolved from the global ws-root setting, e.g. "{{wsRoot}}/bssn"',
-			),
+			v.description('Per-config workspace root. Supports {{wsRoot}} token resolved from the global ws-root setting, e.g. "{{wsRoot}}/bssn"'),
 		),
 	),
 	repos: v.pipe(v.array(RepoSchema), v.description("Repositories to process")),

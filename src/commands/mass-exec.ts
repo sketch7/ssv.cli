@@ -66,9 +66,7 @@ export function registerMassExecCommand(program: Command): void {
 				const wsRoot = wsRootInput || defaultWsRoot;
 
 				const defaultConfigRoot = settings.configRoot ?? "";
-				const configRootPrompt = defaultConfigRoot
-					? chalk.cyan(`Config root [${defaultConfigRoot}]: `)
-					: chalk.cyan("Config root: ");
+				const configRootPrompt = defaultConfigRoot ? chalk.cyan(`Config root [${defaultConfigRoot}]: `) : chalk.cyan("Config root: ");
 				const configRootInput = (await rl.question(configRootPrompt)).trim();
 				const configRoot = configRootInput || defaultConfigRoot;
 
@@ -194,9 +192,7 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 
 		const resolvedShell = resolveShell(opts.shell, config.shell);
 		// Per-config wsRoot override (supports {{wsRoot}} token pointing to the global setting)
-		const rootPath = config.wsRoot
-			? resolve(interpolate(config.wsRoot, { wsRoot: baseRoot }))
-			: baseRoot;
+		const rootPath = config.wsRoot ? resolve(interpolate(config.wsRoot, { wsRoot: baseRoot })) : baseRoot;
 		await setupAll(config, rootPath, resolvedShell, opts.dryRun);
 	}
 
