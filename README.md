@@ -55,7 +55,13 @@ List all config files discovered in the registered directory.
 ssv mass-exec list
 ```
 
-Config names are derived from their path relative to the registered directory, without the `.json` extension (e.g. `ssv/ssv-tools`).
+Config names are derived from their path relative to the registered directory, without the `.json` extension. If the filename begins with the parent directory name followed by a dot, that redundant prefix is trimmed:
+
+| File path (relative) | Config name  |
+| -------------------- | ------------ |
+| `ssv/ssv.tools.json` | `ssv/tools`  |
+| `bssn/bssn.fe.json`  | `bssn/fe`    |
+| `ssv/arcane.json`    | `ssv/arcane` |
 
 ---
 
@@ -76,12 +82,12 @@ ssv mass-exec [run] <names...> [options]
 
 **Name resolution:**
 
-| Input           | Resolves to                                              |
-| --------------- | -------------------------------------------------------- |
-| `ssv/ssv-tools` | Exact config match                                       |
-| `ssv`           | All configs whose name starts with `ssv/` (prefix match) |
-| `all`           | Every config in the registered directory                 |
-| Multiple names  | All matched configs, deduplicated, in order given        |
+| Input          | Resolves to                                                                      |
+| -------------- | -------------------------------------------------------------------------------- |
+| `ssv/tools`    | Single config — matched by name (case-insensitive) trimming prefix when matching |
+| `ssv`          | All configs whose name starts with `ssv/` (prefix match)                         |
+| `all`          | Every config in the registered directory                                         |
+| Multiple names | All matched configs, deduplicated, in order given                                |
 
 #### Examples
 
@@ -93,13 +99,13 @@ ssv mass-exec set S:/git/sketch7.resource/mass-exec
 ssv mass-exec list
 
 # Run a single config (dry-run to preview)
-ssv mass-exec ssv/ssv-tools --dry-run
+ssv mass-exec ssv/tools --dry-run
 
 # Run a single config against a specific repo
-ssv mass-exec ssv/ssv-tools --repo ssv.cli
+ssv mass-exec ssv/tools --repo ssv.cli
 
 # Run multiple configs
-ssv mass-exec ssv/ssv-tools ssv/arcane bssn/fe
+ssv mass-exec ssv/tools ssv/arcane bssn/fe
 
 # Run all configs under the ssv/ prefix
 ssv mass-exec ssv
@@ -111,7 +117,7 @@ ssv mass-exec all
 ssv mass-exec ssv -r S:/git --dry-run
 
 # Override shell
-ssv mass-exec ssv/ssv-tools --shell bash
+ssv mass-exec ssv/tools --shell bash
 ```
 
 ---

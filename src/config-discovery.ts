@@ -24,10 +24,28 @@ export function discoverConfigs(dir: string): ConfigEntry[] {
 		})
 		.map(e => {
 			const filePath = join(e.parentPath, e.name);
-			const name = relative(dir, filePath).replace(/\\/g, "/").replace(/\.json$/, "");
+			const raw = relative(dir, filePath).replace(/\\/g, "/").replace(/\.json$/, "");
+			const name = trimRedundantSegmentPrefix(raw);
 			return { name, filePath };
 		})
 		.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Trims redundant parent-prefix from the last segment.
+ * e.g. `ssv/ssv.tools` → `ssv/tools`, `bssn/bssn.fe` → `bssn/fe`
+ */
+function trimRedundantSegmentPrefix(name: string): string {
+	const slashIdx = name.lastIndexOf("/");
+	if (slashIdx === -1) return name;
+	const parent = name.slice(0, slashIdx);
+	const stem = name.slice(slashIdx + 1);
+	const parentLeaf = parent.slice(parent.lastIndexOf("/") + 1);
+	const prefix = parentLeaf + ".";
+	if (stem.startsWith(prefix) && stem.length > prefix.length) {
+		return parent + "/" + stem.slice(prefix.length);
+	}
+	return name;
 }
 
 export interface ResolveResult {
