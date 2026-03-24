@@ -304,7 +304,7 @@ pnpm build
 # Run compiled CLI
 pnpm start
 
-# Watch mode (runs via tsx, no build step)
+# Watch mode
 pnpm dev -- mass-exec list
 
 # Type-check

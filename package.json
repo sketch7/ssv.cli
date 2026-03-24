@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "tsdown",
-    "dev": "tsx watch src/cli.ts",
+    "dev": "tsdown -w",
     "start": "node dist/cli.mjs",
     "gen-schema": "tsx scripts/gen-schema.ts",
     "lint": "oxlint .",

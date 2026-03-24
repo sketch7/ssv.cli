@@ -7,7 +7,7 @@
 ```bash
 pnpm install          # Install dependencies
 pnpm build            # Compile: tsdown → dist/cli.mjs
-pnpm dev -- <args>    # Watch mode via tsx (no build step), e.g. pnpm dev -- mass-exec --help
+pnpm dev -- <args>    # Watch mode tsdown, e.g. pnpm dev -- mass-exec --help
 pnpm start            # Run compiled CLI
 
 pnpm typecheck        # tsc --noEmit
