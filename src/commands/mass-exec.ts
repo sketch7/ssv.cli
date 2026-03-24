@@ -21,9 +21,7 @@ interface RunOptions {
 }
 
 export function registerMassExecCommand(program: Command): void {
-	const massExec = program
-		.command("mass-exec")
-		.description("Clone repositories and execute commands defined in config files");
+	const massExec = program.command("mass-exec").description("Clone repositories and execute commands defined in config files");
 
 	massExec
 		.command("set")
@@ -271,5 +269,3 @@ function resolveShell(cliShell?: string, configShell?: string): string {
 	if (configShell) return configShell;
 	return platform === "win32" ? "powershell" : "sh";
 }
-
-

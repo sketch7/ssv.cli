@@ -24,7 +24,9 @@ export function discoverConfigs(dir: string): ConfigEntry[] {
 		})
 		.map(e => {
 			const filePath = join(e.parentPath, e.name);
-			const raw = relative(dir, filePath).replace(/\\/g, "/").replace(/\.json$/, "");
+			const raw = relative(dir, filePath)
+				.replace(/\\/g, "/")
+				.replace(/\.json$/, "");
 			const name = trimRedundantSegmentPrefix(raw);
 			return { name, filePath };
 		})
