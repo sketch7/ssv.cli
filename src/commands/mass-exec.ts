@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { consola } from "consola";
+import { colors } from "consola/utils";
 import { execa } from "execa";
 import { Listr } from "listr2";
 import type { DefaultRenderer, ListrTaskWrapper, SimpleRenderer } from "listr2";
@@ -50,10 +51,10 @@ export function registerMassExecCommand(program: Command): void {
 					process.exit(1);
 				}
 				writeSettings({ ...settings, configRoot: absValue });
-				consola.success(`config-root set to: ${absValue}`);
+				consola.success(`config-root set to: ${colors.cyan(absValue)}`);
 			} else {
 				writeSettings({ ...settings, wsRoot: absValue });
-				consola.success(`ws-root set to: ${absValue}`);
+				consola.success(`ws-root set to: ${colors.cyan(absValue)}`);
 			}
 		});
 
@@ -65,11 +66,11 @@ export function registerMassExecCommand(program: Command): void {
 			const rl = createInterface({ input: process.stdin, output: process.stdout });
 			try {
 				const defaultWsRoot = settings.wsRoot ?? homedir();
-				const wsRootInput = (await rl.question(`Workspace root [${defaultWsRoot}]: `)).trim();
+				const wsRootInput = (await rl.question(colors.cyan(`Workspace root [${defaultWsRoot}]: `))).trim();
 				const wsRoot = wsRootInput || defaultWsRoot;
 
 				const defaultConfigRoot = settings.configRoot ?? "";
-				const configRootPrompt = defaultConfigRoot ? `Config root [${defaultConfigRoot}]: ` : "Config root: ";
+				const configRootPrompt = defaultConfigRoot ? colors.cyan(`Config root [${defaultConfigRoot}]: `) : colors.cyan("Config root: ");
 				const configRootInput = (await rl.question(configRootPrompt)).trim();
 				const configRoot = configRootInput || defaultConfigRoot;
 
@@ -77,9 +78,9 @@ export function registerMassExecCommand(program: Command): void {
 				if (configRoot) newSettings.configRoot = resolve(configRoot);
 				writeSettings(newSettings);
 
-				consola.success(`Settings saved to: ${getSettingsPath()}`);
-				consola.info(`  ws-root:     ${resolve(wsRoot)}`);
-				if (configRoot) consola.info(`  config-root: ${resolve(configRoot)}`);
+				consola.success(`Settings saved to: ${colors.dim(getSettingsPath())}`);
+				consola.info(`  ws-root:     ${colors.dim(resolve(wsRoot))}`);
+				if (configRoot) consola.info(`  config-root: ${colors.dim(resolve(configRoot))}`);
 			} finally {
 				rl.close();
 			}
@@ -99,9 +100,9 @@ export function registerMassExecCommand(program: Command): void {
 				consola.warn(`No config files found in: ${settings.configRoot}`);
 				return;
 			}
-			consola.info(`mass-exec configs  ${settings.configRoot}\n`);
+			consola.info(`${colors.cyan("mass-exec configs")}  ${colors.dim(settings.configRoot)}\n`);
 			for (const entry of configs) {
-				consola.log(`  ${entry.name}  ${entry.filePath}`);
+				consola.log(`  ${colors.cyan(entry.name)}  ${colors.dim(entry.filePath)}`);
 			}
 		});
 
@@ -237,15 +238,15 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 		mkdirSync(baseRoot, { recursive: true });
 	}
 
-	consola.info(`SSV Toolz  » mass-exec`);
-	consola.info(`Root: ${baseRoot}`);
+	consola.info(`${colors.cyan("SSV Toolz")}  ${colors.dim("»")} mass-exec`);
+	consola.info(`${colors.dim("Root:")} ${baseRoot}`);
 
 	if (opts.dryRun) {
 		consola.warn("[dry-run] No commands will be executed");
 	}
 
 	for (const entry of entries) {
-		consola.info(`Config: ${entry.name}  ${entry.filePath}`);
+		consola.info(`${colors.dim("Config:")} ${colors.cyan(entry.name)}  ${colors.dim(entry.filePath)}`);
 
 		let raw: unknown;
 		try {
@@ -335,7 +336,7 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 							if (!urlTemplate) return;
 							const url = interpolate(urlTemplate, projectVars);
 							const cmd = `git clone ${url} ${localName}`;
-							subTask.output = dryRun ? `(dry-run) ${cmd}` : cmd;
+							subTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd)}` : colors.dim(cmd);
 							if (!dryRun) {
 								await runCommand(shell, cmd, rootPath);
 							}
@@ -371,9 +372,9 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 							return subTask.newListr(
 								waves.flatMap(wave =>
 									wave.map(cmd => ({
-										title: `[${cmd.name}] ${cmd.run}`,
+										title: `${colors.dim(`[${cmd.name}]`)} ${colors.white(cmd.run)}`,
 										task: async (_ctx3, cmdTask) => {
-											cmdTask.output = dryRun ? `(dry-run) ${cmd.run}` : cmd.run;
+											cmdTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd.run)}` : colors.dim(cmd.run);
 											if (!dryRun) {
 												await runCommand(shell, cmd.run, localPath);
 											}
@@ -395,9 +396,9 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 							return subTask.newListr(
 								waves.flatMap(wave =>
 									wave.map(cmd => ({
-										title: `[${cmd.name}] ${cmd.run}`,
+										title: `${colors.dim(`[${cmd.name}]`)} ${colors.white(cmd.run)}`,
 										task: async (_ctx3, cmdTask) => {
-											cmdTask.output = dryRun ? `(dry-run) ${cmd.run}` : cmd.run;
+											cmdTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd.run)}` : colors.dim(cmd.run);
 											if (!dryRun) {
 												await runCommand(shell, cmd.run, localPath);
 											}
