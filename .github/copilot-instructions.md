@@ -27,7 +27,7 @@ pnpm gen-schema       # Regenerate mass-exec.config.schema.json from config-sche
 src/
   cli.ts                  Entry point — Commander setup, --log-level, update-notifier, registers commands
   config-schema.ts        Valibot schemas + inferred TypeScript types (source of truth)
-  config-discovery.ts     Scans a directory for .json config files; resolves display names
+  config-discovery.ts     Scans a directory for .yaml/.yml config files; resolves display names
   interpolate.ts          {token} interpolation utilities
   settings.ts             Read/write ~/.ssv/config.json (ws-root, config-root)
   commands/
@@ -56,23 +56,25 @@ scripts/
 
 - Add `.pipe(v.description("…"))` to schema fields for IDE hints and JSON Schema output.
 - After changing any schema, run `pnpm gen-schema` — `mass-exec.config.schema.json` is **auto-generated, never edit manually**.
-- `CommandEntry` is a **union** of two shapes:
-  - Shorthand: `{ "build": "npm run build" }` — single-key record, backward-compatible.
-  - Rich object: `{ name: "build", run: "npm run build", needs?: ["install"] }` — supports dependency ordering.
-- Use `normalizeCommand(entry)` to convert either shape to `NormalizedCommand { name, run, needs }` inside commands.
+- Config files use **YAML** (`.yaml` / `.yml`). JSON configs are not supported.
+- Steps are defined as `StepSchema` objects: `{ name, run, needs?, parallel? }` — no shorthand form.
+- `parallel: true` on consecutive steps groups them into a concurrent wave; non-parallel steps run sequentially.
+- Use `normalizeStep(step)` to convert a `Step` to `NormalizedStep { name, run, needs, parallel }` inside commands.
+- `globalSteps` / `steps` replace the old `globalCommands` / `commands` fields.
+- `skipGlobalSteps` replaces the old `skipGlobalCommands` field (per-project step filtering).
 
 ### Output colors (`consola/utils`)
 
 Import via `import { colors } from "consola/utils"`. Never use `chalk`.
 
-| Purpose                   | Color                |
-| ------------------------- | -------------------- |
-| Info / labels / names     | `colors.cyan(...)`   |
-| Warnings                  | `colors.yellow(...)` |
-| Errors                    | `colors.red(...)`    |
-| Secondary / dim text      | `colors.dim(...)`    |
-| Command strings           | `colors.white(...)`  |
-| Dry-run prefix            | `colors.yellow(...)`  |
+| Purpose               | Color                |
+| --------------------- | -------------------- |
+| Info / labels / names | `colors.cyan(...)`   |
+| Warnings              | `colors.yellow(...)` |
+| Errors                | `colors.red(...)`    |
+| Secondary / dim text  | `colors.dim(...)`    |
+| Command strings       | `colors.white(...)`  |
+| Dry-run prefix        | `colors.yellow(...)` |
 
 ### Adding a new command
 
@@ -82,19 +84,20 @@ Import via `import { colors } from "consola/utils"`. Never use `chalk`.
 
 ## Toolchain
 
-| Tool               | Role                                            |
-| ------------------ | ----------------------------------------------- |
-| `tsdown`           | TypeScript → ESM bundler (wraps Rolldown)       |
-| `tsx`              | TypeScript runner / watcher (dev only)          |
-| `oxlint`           | Fast linter                                     |
-| `oxfmt`            | Rust-based formatter                            |
-| `valibot`          | Runtime schema validation + type inference      |
-| `consola`          | Logging (`consola.info/warn/error/success/fatal`) |
-| `consola/utils`    | `colors` export — ANSI color helpers            |
-| `listr2`           | Concurrent task runner with progress rendering  |
-| `execa`            | Shell command execution (`stdio: "pipe"`)       |
-| `commander`        | CLI argument parsing                            |
-| `update-notifier`  | Non-blocking update check on each run           |
+| Tool              | Role                                              |
+| ----------------- | ------------------------------------------------- |
+| `tsdown`          | TypeScript → ESM bundler (wraps Rolldown)         |
+| `tsx`             | TypeScript runner / watcher (dev only)            |
+| `oxlint`          | Fast linter                                       |
+| `oxfmt`           | Rust-based formatter                              |
+| `valibot`         | Runtime schema validation + type inference        |
+| `consola`         | Logging (`consola.info/warn/error/success/fatal`) |
+| `consola/utils`   | `colors` export — ANSI color helpers              |
+| `listr2`          | Concurrent task runner with progress rendering    |
+| `execa`           | Shell command execution (`stdio: "pipe"`)         |
+| `yaml`            | YAML config file parsing                          |
+| `commander`       | CLI argument parsing                              |
+| `update-notifier` | Non-blocking update check on each run             |
 
 ## Requirements
 
