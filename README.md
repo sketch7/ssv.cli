@@ -27,6 +27,11 @@ pnpm add -D @ssv/cli
 
 ## Commands
 
+> **Global option — available on all commands:**
+>
+> `--log-level <level>` — set log verbosity: `silent` | `error` | `warn` | `info` | `debug` | `verbose` (default: `info`).
+> Use `debug` or `verbose` to stream live command output instead of capturing it.
+
 ### `mass-exec`
 
 Clone a set of git repositories and run commands against each one — global commands (shared across all projects) and per-project commands. A Node.js replacement for the PowerShell `git-mass-commands.ps1` script.
@@ -94,7 +99,8 @@ ssv mass-exec [run] <names...> [options]
 | `--project <filter>` |       | Only process projects whose name contains this string (case-insensitive substring match).                                    |                                       |
 | `--root <path>`      | `-r`  | Override root directory where repositories are cloned. When omitted, uses the global `ws-root` setting (or `./` if not set). |                                       |
 | `--shell <shell>`    | `-s`  | Shell used to execute commands (`powershell`, `pwsh`, `bash`, `sh`, …).                                                      | `powershell` on Windows, `sh` on Unix |
-| `--dry-run`          | `-d`  | Print all commands with their working directory without executing anything.                                                  | `false`                               |
+| `--dry-run`          | `-d`  | Preview all commands with their working directory via the progress renderer — nothing is executed.                           | `false`                               |
+| `--concurrency <n>`  | `-c`  | Number of projects to process in parallel.                                                                                   | `5`                                   |
 
 **Name resolution:**
 
@@ -141,6 +147,12 @@ ssv mass-exec bssn
 
 # Override shell
 ssv mass-exec ssv/tools --shell bash
+
+# Run 10 projects concurrently
+ssv mass-exec all --concurrency 10
+
+# Preview with verbose output (streams each command's output live)
+ssv mass-exec ssv --dry-run --log-level debug
 ```
 
 ---
@@ -175,6 +187,14 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
     "defaultBranch": "main",
   },
 
+  // Optional: number of projects to run concurrently (overridden by --concurrency flag). Default: 5
+  "concurrency": 3,
+
+  // Optional: run globalCommands and project commands concurrently within each project.
+  // When true, commands with no `needs` dependencies run in parallel.
+  // Default: false (sequential)
+  "parallelCommands": false,
+
   "projects": [
     {
       "name": "ssv-core",
@@ -188,7 +208,11 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
       // Optional: override org for this project only
       "org": "sketch7",
 
-      // Optional: commands run after globalCommands for this project
+      // Optional: override parallelCommands for this project only
+      "parallelCommands": true,
+
+      // Optional: commands run after globalCommands for this project.
+      // Shorthand form (backward-compatible):
       "commands": [{ "npm-install": "npm install" }, { "build": "npm run build" }],
 
       // Optional: skip specific globalCommands for this project
@@ -206,6 +230,17 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
         "defaultBranch": "master",
       },
     },
+    {
+      "name": "app",
+      // Rich command form with `needs` for dependency ordering:
+      "commands": [
+        { "name": "install", "run": "npm install" },
+        { "name": "build", "run": "npm run build", "needs": ["install"] },
+        { "name": "test", "run": "npm test", "needs": ["build"] },
+        // lint can run in parallel with test (both depend only on build)
+        { "name": "lint", "run": "npm run lint", "needs": ["build"] },
+      ],
+    },
   ],
 
   // Optional: run for every project (skippable per project via skipGlobalCommands)
@@ -217,6 +252,30 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
   ],
 }
 ```
+
+### Command formats
+
+Both `globalCommands` and `commands` accept two formats that can be mixed:
+
+**Shorthand** — backward-compatible single-key record:
+
+```jsonc
+{ "git-pull": "git pull" }
+```
+
+**Rich object** — enables `needs` for dependency ordering:
+
+```jsonc
+{ "name": "build", "run": "npm run build", "needs": ["install"] }
+```
+
+| Field   | Required | Description                                              |
+| ------- | -------- | -------------------------------------------------------- |
+| `name`  | ✓        | Command identifier (used in `needs` and progress output) |
+| `run`   | ✓        | Shell expression. Supports interpolation tokens.         |
+| `needs` |          | Names of commands that must complete before this one.    |
+
+When `parallelCommands: true`, commands whose `needs` are already satisfied run concurrently within the same wave. Circular dependencies are detected at runtime and reported as a fatal error.
 
 ### Interpolation tokens
 
@@ -245,7 +304,7 @@ pnpm build
 # Run compiled CLI
 pnpm start
 
-# Watch mode (runs via tsx, no build step)
+# Watch mode
 pnpm dev -- mass-exec list
 
 # Type-check
@@ -258,10 +317,10 @@ pnpm lint
 pnpm lint:fix
 
 # Format
-pnpm format
+pnpm fmt
 
 # Check formatting without modifying
-pnpm format:check
+pnpm fmt:check
 
 # Regenerate mass-exec.config.schema.json (run after editing src/config-schema.ts)
 pnpm gen-schema
