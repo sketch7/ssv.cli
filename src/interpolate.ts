@@ -1,40 +1,41 @@
-import type { MassCommandsConfig, RepoConfig } from "./config-schema.js";
+import type { MassCommandsConfig, ProjectConfig } from "./config-schema.js";
 
 export type InterpolationVars = Record<string, string>;
 
 /**
- * Replaces {{key}} tokens in a template string with values from the vars map.
+ * Replaces {key} tokens in a template string with values from the vars map.
  * Unknown tokens are left as-is.
  */
 export function interpolate(template: string, vars: InterpolationVars): string {
-	return template.replace(/\{\{([^}]+)\}\}/g, (_match, key: string) => {
+	return template.replace(/\{([^{}]+)\}/g, (_match, key: string) => {
 		const trimmed = key.trim();
-		return trimmed in vars ? vars[trimmed] : `{{${trimmed}}}`;
+		return trimmed in vars ? vars[trimmed] : `{${trimmed}}`;
 	});
 }
 
 /**
- * Builds the full interpolation variable map for a given repo.
+ * Builds the full interpolation variable map for a given project.
  *
  * Resolution priority:
  * - config.vars (lowest — generic config-level vars)
- * - Built-in tokens: repo.name, projectName (alias), org
- *   - org resolution: repo.org → config.org → config.vars?.org → ""
+ * - Built-in tokens: projectName, org
+ *   - org resolution: project.org → config.org → config.vars?.org → ""
  *
  * Available tokens in URLs and commands:
- *   {{repo.name}}     — the repository name (e.g. "ssv-core")
- *   {{projectName}}   — alias for {{repo.name}}
- *   {{org}}           — organisation (e.g. "sketch7")
- *   {{anyKey}}        — any key defined in config.vars
+ *   {projectName}   — the project name (e.g. "ssv-core")
+ *   {org}            — organisation (e.g. "sketch7")
+ *   {anyKey}         — any key defined in config.vars
  */
-export function buildVars(config: MassCommandsConfig, repo: RepoConfig): InterpolationVars {
-	const org = repo.org ?? config.org ?? config.vars?.["org"] ?? "";
+export function buildVars(config: MassCommandsConfig, project: ProjectConfig): InterpolationVars {
+	const org = project.org ?? config.org ?? config.vars?.["org"] ?? "";
 
 	return {
-		// config.vars spread first so built-ins always win
+		// config.vars spread first (lowest priority)
 		...config.vars,
-		"repo.name": repo.name,
-		projectName: repo.name,
+		// project.vars override config.vars
+		...project.vars,
+		// built-ins always win
+		projectName: project.name,
 		org: org,
 	};
 }

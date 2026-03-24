@@ -4,7 +4,8 @@ import { dirname, join } from "node:path";
 import * as v from "valibot";
 
 const SsvSettingsSchema = v.object({
-	massExecDir: v.optional(v.pipe(v.string(), v.description("Registered directory scanned for mass-exec config files"))),
+	configRoot: v.optional(v.pipe(v.string(), v.description("Registered directory scanned for mass-exec config files"))),
+	wsRoot: v.optional(v.pipe(v.string(), v.description("Global workspace root — default directory where repos are cloned"))),
 });
 
 export type SsvSettings = v.InferOutput<typeof SsvSettingsSchema>;
@@ -19,7 +20,11 @@ export function readSettings(): SsvSettings {
 		return {};
 	}
 	try {
-		const raw = JSON.parse(readFileSync(settingsPath, "utf8"));
+		const raw = JSON.parse(readFileSync(settingsPath, "utf8")) as Record<string, unknown>;
+		// migrate legacy massExecDir field
+		if (!("configRoot" in raw) && "massExecDir" in raw) {
+			raw["configRoot"] = raw["massExecDir"];
+		}
 		const result = v.safeParse(SsvSettingsSchema, raw);
 		return result.success ? result.output : {};
 	} catch {

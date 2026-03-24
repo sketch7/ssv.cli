@@ -29,21 +29,37 @@ pnpm add -D @ssv/cli
 
 ### `mass-exec`
 
-Clone a set of git repositories and run commands against each one — global commands (shared across all repos) and per-repo commands. A Node.js replacement for the PowerShell `git-mass-commands.ps1` script.
+Clone a set of git repositories and run commands against each one — global commands (shared across all projects) and per-project commands. A Node.js replacement for the PowerShell `git-mass-commands.ps1` script.
 
 ```
 ssv mass-exec <subcommand>
 ```
 
-#### `mass-exec set <path>`
+#### `mass-exec set <key> <value>`
 
-Register the directory that contains your mass-exec config files. Only needs to be run once per machine.
+Persist a setting. Available keys:
+
+| Key           | Description                                            |
+| ------------- | ------------------------------------------------------ |
+| `config-root` | Directory scanned for mass-exec config files           |
+| `ws-root`     | Global workspace root — default dir for project clones |
 
 ```bash
-ssv mass-exec set S:/git/sketch7.resource/mass-exec
+ssv mass-exec set config-root S:/git/sketch7.resource/mass-exec
+ssv mass-exec set ws-root S:/git
 ```
 
-The path is persisted to `~/.ssv/config.json`.
+Settings are persisted to `~/.ssv/config.json`.
+
+---
+
+#### `mass-exec setup`
+
+Interactive wizard to configure `ws-root` and `config-root` in one step. Prefills current values as defaults.
+
+```bash
+ssv mass-exec setup
+```
 
 ---
 
@@ -73,12 +89,12 @@ Run one or more configs by name. `run` is the default subcommand and can be omit
 ssv mass-exec [run] <names...> [options]
 ```
 
-| Option            | Alias | Description                                                                                    | Default                               |
-| ----------------- | ----- | ---------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `--repo <filter>` |       | Only process repos whose name contains this string (case-insensitive substring match).         |                                       |
-| `--root <path>`   | `-r`  | Root directory where repositories are cloned into. Created automatically if it does not exist. | `./`                                  |
-| `--shell <shell>` | `-s`  | Shell used to execute commands (`powershell`, `pwsh`, `bash`, `sh`, …).                        | `powershell` on Windows, `sh` on Unix |
-| `--dry-run`       | `-d`  | Print all commands with their working directory without executing anything.                    | `false`                               |
+| Option               | Alias | Description                                                                                                                  | Default                               |
+| -------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `--project <filter>` |       | Only process projects whose name contains this string (case-insensitive substring match).                                    |                                       |
+| `--root <path>`      | `-r`  | Override root directory where repositories are cloned. When omitted, uses the global `ws-root` setting (or `./` if not set). |                                       |
+| `--shell <shell>`    | `-s`  | Shell used to execute commands (`powershell`, `pwsh`, `bash`, `sh`, …).                                                      | `powershell` on Windows, `sh` on Unix |
+| `--dry-run`          | `-d`  | Print all commands with their working directory without executing anything.                                                  | `false`                               |
 
 **Name resolution:**
 
@@ -92,8 +108,12 @@ ssv mass-exec [run] <names...> [options]
 #### Examples
 
 ```bash
-# Register config directory once
-ssv mass-exec set S:/git/sketch7.resource/mass-exec
+# Register config directory and workspace root
+ssv mass-exec set config-root S:/git/sketch7.resource/mass-exec
+ssv mass-exec set ws-root S:/git
+
+# Or configure both interactively
+ssv mass-exec setup
 
 # List all available configs
 ssv mass-exec list
@@ -101,8 +121,8 @@ ssv mass-exec list
 # Run a single config (dry-run to preview)
 ssv mass-exec ssv/tools --dry-run
 
-# Run a single config against a specific repo
-ssv mass-exec ssv/tools --repo ssv.cli
+# Run a single config against a specific project
+ssv mass-exec ssv/tools --project ssv.cli
 
 # Run multiple configs
 ssv mass-exec ssv/tools ssv/arcane bssn/fe
@@ -115,6 +135,9 @@ ssv mass-exec all
 
 # Run all ssv/* configs into a custom root, dry-run
 ssv mass-exec ssv -r S:/git --dry-run
+
+# Run bssn configs — wsRoot resolved from global ws-root setting
+ssv mass-exec bssn
 
 # Override shell
 ssv mass-exec ssv/tools --shell bash
@@ -130,51 +153,64 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
 {
   "$schema": "node_modules/@ssv/cli/mass-exec.config.schema.json",
 
+  // Optional: per-config workspace root (projects for this config are cloned here)
+  // Supports {wsRoot} token — resolves to the global ws-root setting
+  "wsRoot": "{wsRoot}/bssn",
+
   // Optional: prepended to the local clone folder name
   "clonePrefix": "@ssv",
 
   // Optional: default shell for this config (overridden by --shell flag)
   "shell": "powershell",
 
-  // Optional: default org for {{org}} interpolation
+  // Optional: default org for {org} interpolation
   "org": "sketch7",
 
-  // Optional: default URL template for all repos (used when repo.url is not set)
-  "repoUrlTemplate": "https://github.com/{{org}}/{{repo.name}}.git",
+  // Optional: default URL template for all projects (used when project.url is not set)
+  "cloneUrlTemplate": "https://github.com/{org}/{projectName}.git",
 
   // Optional: arbitrary variables available in URL and command interpolation
   "vars": {
     "baseUrl": "https://github.com",
+    "defaultBranch": "main",
   },
 
-  "repos": [
+  "projects": [
     {
       "name": "ssv-core",
 
-      // Optional: overrides config-level repoUrlTemplate for this repo
-      "url": "https://github.com/{{org}}/{{repo.name}}.git",
+      // Optional: overrides config-level cloneUrlTemplate for this project
+      "url": "https://github.com/{org}/{projectName}.git",
 
-      // Optional: override clonePrefix for this repo only
+      // Optional: override clonePrefix for this project only
       "clonePrefix": "@ssv",
 
-      // Optional: override org for this repo only
+      // Optional: override org for this project only
       "org": "sketch7",
 
-      // Optional: commands run after globalCommands for this repo
+      // Optional: commands run after globalCommands for this project
       "commands": [{ "npm-install": "npm install" }, { "build": "npm run build" }],
 
-      // Optional: skip specific globalCommands for this repo
+      // Optional: skip specific globalCommands for this project
       "skipGlobalCommands": ["git-cleanup-branches"],
     },
     {
-      // url omitted — repoUrlTemplate is used automatically
+      // url omitted — cloneUrlTemplate is used automatically
       "name": "ssv-tools",
+    },
+    {
+      "name": "legacy-project",
+
+      // Optional: override config-level vars for this project only
+      "vars": {
+        "defaultBranch": "master",
+      },
     },
   ],
 
-  // Optional: run for every repo (skippable per repo via skipGlobalCommands)
+  // Optional: run for every project (skippable per project via skipGlobalCommands)
   "globalCommands": [
-    { "git-checkout": "git checkout main" },
+    { "git-checkout": "git checkout {defaultBranch}" },
     { "git-pull": "git pull" },
     { "git-fetch-prune": "git fetch --prune origin" },
     { "git-cleanup-branches": "git branch -vv | grep ': gone]' | awk '{print $1}' | xargs git branch -D" },
@@ -186,14 +222,14 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
 
 Available in **both** `url` and command strings:
 
-| Token             | Resolves to                                          |
-| ----------------- | ---------------------------------------------------- |
-| `{{repo.name}}`   | Repository name (e.g. `ssv-core`)                    |
-| `{{projectName}}` | Alias for `{{repo.name}}`                            |
-| `{{org}}`         | `repo.org` → `config.org` → `config.vars.org` → `""` |
-| `{{anyKey}}`      | Any key defined in `config.vars`                     |
+| Token           | Resolves to                                                          |
+| --------------- | -------------------------------------------------------------------- |
+| `{projectName}` | Project name (e.g. `ssv-core`)                                       |
+| `{org}`         | `project.org` → `config.org` → `config.vars.org` → `""`              |
+| `{wsRoot}`      | Global ws-root setting (used in per-config `wsRoot` field)           |
+| `{anyKey}`      | Any key in `config.vars`, overridable per project via `project.vars` |
 
-Unknown tokens are left as-is (e.g. `{{unknown}}` stays `{{unknown}}`).
+Unknown tokens are left as-is (e.g. `{unknown}` stays `{unknown}`).
 
 ---
 
