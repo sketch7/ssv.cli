@@ -29,6 +29,15 @@
       "type": "string",
       "description": "Per-config workspace root. Supports {wsRoot} token resolved from the global ws-root setting, e.g. \"{wsRoot}/bssn\""
     },
+    "concurrency": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of projects to run concurrently. Overridden by CLI --concurrency flag. Default: 5"
+    },
+    "parallelCommands": {
+      "type": "boolean",
+      "description": "Run commands (globalCommands and project commands) concurrently within each project. Waves are determined by `needs` dependencies. Default: false (sequential)"
+    },
     "projects": {
       "type": "array",
       "items": {
@@ -56,10 +65,30 @@
           "commands": {
             "type": "array",
             "items": {
-              "type": "object",
-              "propertyNames": { "type": "string" },
-              "additionalProperties": { "type": "string" },
-              "description": "A single-key record mapping a command name to a shell expression, e.g. { \"git-pull\": \"git pull\" }"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "propertyNames": { "type": "string" },
+                  "additionalProperties": { "type": "string" },
+                  "description": "A single-key record mapping a command name to a shell expression, e.g. { \"git-pull\": \"git pull\" }"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "description": "Command identifier" },
+                    "run": {
+                      "type": "string",
+                      "description": "Shell expression to execute. Supports interpolation tokens."
+                    },
+                    "needs": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "description": "Names of commands that must complete before this one runs (within the same context)"
+                    }
+                  },
+                  "required": ["name", "run"]
+                }
+              ]
             },
             "description": "Commands specific to this project, run after global commands"
           },
@@ -67,6 +96,10 @@
             "type": "array",
             "items": { "type": "string" },
             "description": "Keys of globalCommands entries to skip for this project"
+          },
+          "parallelCommands": {
+            "type": "boolean",
+            "description": "Run commands concurrently for this project. Overrides config-level parallelCommands. Default: false"
           }
         },
         "required": ["name"]
@@ -76,10 +109,30 @@
     "globalCommands": {
       "type": "array",
       "items": {
-        "type": "object",
-        "propertyNames": { "type": "string" },
-        "additionalProperties": { "type": "string" },
-        "description": "A single-key record mapping a command name to a shell expression, e.g. { \"git-pull\": \"git pull\" }"
+        "anyOf": [
+          {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": { "type": "string" },
+            "description": "A single-key record mapping a command name to a shell expression, e.g. { \"git-pull\": \"git pull\" }"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Command identifier" },
+              "run": {
+                "type": "string",
+                "description": "Shell expression to execute. Supports interpolation tokens."
+              },
+              "needs": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Names of commands that must complete before this one runs (within the same context)"
+              }
+            },
+            "required": ["name", "run"]
+          }
+        ]
       },
       "description": "Commands run for every project (filtered by skipGlobalCommands per project)"
     }
