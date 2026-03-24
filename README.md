@@ -172,6 +172,7 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
   // Optional: arbitrary variables available in URL and command interpolation
   "vars": {
     "baseUrl": "https://github.com",
+    "defaultBranch": "main",
   },
 
   "repos": [
@@ -197,11 +198,19 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
       // url omitted — repoUrlTemplate is used automatically
       "name": "ssv-tools",
     },
+    {
+      "name": "legacy-repo",
+
+      // Optional: override config-level vars for this repo only
+      "vars": {
+        "defaultBranch": "master",
+      },
+    },
   ],
 
   // Optional: run for every repo (skippable per repo via skipGlobalCommands)
   "globalCommands": [
-    { "git-checkout": "git checkout main" },
+    { "git-checkout": "git checkout {{defaultBranch}}" },
     { "git-pull": "git pull" },
     { "git-fetch-prune": "git fetch --prune origin" },
     { "git-cleanup-branches": "git branch -vv | grep ': gone]' | awk '{print $1}' | xargs git branch -D" },
@@ -213,13 +222,13 @@ Fully backward-compatible with the original PowerShell `*.config.json` schema.
 
 Available in **both** `url` and command strings:
 
-| Token             | Resolves to                                                |
-| ----------------- | ---------------------------------------------------------- |
-| `{{repo.name}}`   | Repository name (e.g. `ssv-core`)                          |
-| `{{projectName}}` | Alias for `{{repo.name}}`                                  |
-| `{{org}}`         | `repo.org` → `config.org` → `config.vars.org` → `""`       |
-| `{{wsRoot}}`      | Global ws-root setting (used in per-config `wsRoot` field) |
-| `{{anyKey}}`      | Any key defined in `config.vars`                           |
+| Token             | Resolves to                                                    |
+| ----------------- | -------------------------------------------------------------- |
+| `{{repo.name}}`   | Repository name (e.g. `ssv-core`)                              |
+| `{{projectName}}` | Alias for `{{repo.name}}`                                      |
+| `{{org}}`         | `repo.org` → `config.org` → `config.vars.org` → `""`           |
+| `{{wsRoot}}`      | Global ws-root setting (used in per-config `wsRoot` field)     |
+| `{{anyKey}}`      | Any key in `config.vars`, overridable per repo via `repo.vars` |
 
 Unknown tokens are left as-is (e.g. `{{unknown}}` stays `{{unknown}}`).
 

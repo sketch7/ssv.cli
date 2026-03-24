@@ -18,6 +18,9 @@ const RepoSchema = v.object({
 	),
 	org: v.optional(v.pipe(v.string(), v.description("Per-repo org override — used for {{org}} interpolation"))),
 	clonePrefix: v.optional(v.pipe(v.string(), v.description("Per-repo clone prefix override (overrides config-level clonePrefix)"))),
+	vars: v.optional(
+		v.pipe(v.record(v.string(), v.string()), v.description("Per-repo variable overrides — merged over config-level vars for this repo only")),
+	),
 	commands: v.optional(v.pipe(v.array(CommandEntrySchema), v.description("Commands specific to this repo, run after global commands"))),
 	skipGlobalCommands: v.optional(v.pipe(v.array(v.string()), v.description("Keys of globalCommands entries to skip for this repo"))),
 });

@@ -31,8 +31,11 @@ export function buildVars(config: MassCommandsConfig, repo: RepoConfig): Interpo
 	const org = repo.org ?? config.org ?? config.vars?.["org"] ?? "";
 
 	return {
-		// config.vars spread first so built-ins always win
+		// config.vars spread first (lowest priority)
 		...config.vars,
+		// repo.vars override config.vars
+		...repo.vars,
+		// built-ins always win
 		"repo.name": repo.name,
 		projectName: repo.name,
 		org: org,
