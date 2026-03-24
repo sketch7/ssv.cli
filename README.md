@@ -32,35 +32,86 @@ pnpm add -D @ssv/cli
 Clone a set of git repositories and run commands against each one — global commands (shared across all repos) and per-repo commands. A Node.js replacement for the PowerShell `git-mass-commands.ps1` script.
 
 ```
-ssv mass-exec [options]
+ssv mass-exec <subcommand>
+```
+
+#### `mass-exec set <path>`
+
+Register the directory that contains your mass-exec config files. Only needs to be run once per machine.
+
+```bash
+ssv mass-exec set S:/git/sketch7.resource/mass-exec
+```
+
+The path is persisted to `~/.ssv/config.json`.
+
+---
+
+#### `mass-exec list`
+
+List all config files discovered in the registered directory.
+
+```bash
+ssv mass-exec list
+```
+
+Config names are derived from their path relative to the registered directory, without the `.json` extension (e.g. `ssv/ssv-tools`).
+
+---
+
+#### `mass-exec [run] <names...>`
+
+Run one or more configs by name. `run` is the default subcommand and can be omitted.
+
+```
+ssv mass-exec [run] <names...> [options]
 ```
 
 | Option            | Alias | Description                                                                                    | Default                               |
 | ----------------- | ----- | ---------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `--config <file>` | `-c`  | Config file path. Repeatable — pass multiple times to process several configs in sequence.     | _(required)_                          |
+| `--repo <filter>` |       | Only process repos whose name contains this string (case-insensitive substring match).         |                                       |
 | `--root <path>`   | `-r`  | Root directory where repositories are cloned into. Created automatically if it does not exist. | `./`                                  |
 | `--shell <shell>` | `-s`  | Shell used to execute commands (`powershell`, `pwsh`, `bash`, `sh`, …).                        | `powershell` on Windows, `sh` on Unix |
 | `--dry-run`       | `-d`  | Print all commands with their working directory without executing anything.                    | `false`                               |
 
+**Name resolution:**
+
+| Input           | Resolves to                                              |
+| --------------- | -------------------------------------------------------- |
+| `ssv/ssv-tools` | Exact config match                                       |
+| `ssv`           | All configs whose name starts with `ssv/` (prefix match) |
+| `all`           | Every config in the registered directory                 |
+| Multiple names  | All matched configs, deduplicated, in order given        |
+
 #### Examples
 
 ```bash
-# Single config, dry-run to preview
-ssv mass-exec -c ../../powershell/git-mass-commands/ssv/ssv.arcane.config.json -r S:/toolz-test --dry-run
-ssv mass-exec -c ./mass-exec-cfgs/ssv.tools.config.json -r S:/toolz-test --dry-run
+# Register config directory once
+ssv mass-exec set S:/git/sketch7.resource/mass-exec
 
-# Clone + run with a specific shell
-ssv mass-exec -c ./ssv/ssv.core.config.json -r S:/git --shell bash
+# List all available configs
+ssv mass-exec list
 
-# Process multiple configs in sequence (replaces @ssv.all.ps1)
-ssv mass-exec \
-  -c ./ssv/ssv.core.config.json \
-  -c ./ssv/ssv.arcane.config.json \
-  -c ./ssv/ssv.ngx-apps.config.json \
-  -r S:/git
+# Run a single config (dry-run to preview)
+ssv mass-exec ssv/ssv-tools --dry-run
 
-# Configs live next to the repos root
-ssv mass-exec -c /path/to/configs/my.config.json -r ./workspace
+# Run a single config against a specific repo
+ssv mass-exec ssv/ssv-tools --repo ssv.cli
+
+# Run multiple configs
+ssv mass-exec ssv/ssv-tools ssv/arcane bssn/fe
+
+# Run all configs under the ssv/ prefix
+ssv mass-exec ssv
+
+# Run everything
+ssv mass-exec all
+
+# Run all ssv/* configs into a custom root, dry-run
+ssv mass-exec ssv -r S:/git --dry-run
+
+# Override shell
+ssv mass-exec ssv/ssv-tools --shell bash
 ```
 
 ---
@@ -153,7 +204,7 @@ pnpm build
 pnpm start
 
 # Watch mode (runs via tsx, no build step)
-pnpm dev -- mass-exec --help
+pnpm dev -- mass-exec list
 
 # Type-check
 pnpm typecheck
