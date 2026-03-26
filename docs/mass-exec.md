@@ -73,7 +73,7 @@ ssv mass-exec [run] <names...> [options]
 
 | Option               | Alias | Description                                                                                                                  | Default                               |
 | -------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `--project <filter>` |       | Only process projects whose name contains this string (case-insensitive substring match).                                    |                                       |
+| `--project <filter>` | `-p`  | Only process projects whose name contains this string (case-insensitive substring match).                                    |                                       |
 | `--root <path>`      | `-r`  | Override root directory where repositories are cloned. When omitted, uses the global `ws-root` setting (or `./` if not set). |                                       |
 | `--shell <shell>`    | `-s`  | Shell used to execute commands (`powershell`, `pwsh`, `bash`, `sh`, …).                                                      | `powershell` on Windows, `sh` on Unix |
 | `--dry-run`          | `-d`  | Preview all commands with their working directory via the progress renderer — nothing is executed.                           | `false`                               |

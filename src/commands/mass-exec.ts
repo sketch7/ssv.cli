@@ -115,7 +115,7 @@ export default function registerMassExecCommand(program: Command): void {
 		new Command("run")
 			.description("Run one or more mass-exec config(s) by name, prefix, or 'all'")
 			.argument("<names...>", "Config name(s): exact (ssv/tools), prefix (ssv), or 'all'")
-			.option("--project <filter>", "Only run projects whose name contains this string (case-insensitive)")
+			.option("-p, --project <filter>", "Only run projects whose name contains this string (case-insensitive)")
 			.option("-r, --root <path>", "Override root path where repos are cloned (ignores ws-root setting)")
 			.option("-s, --shell <shell>", "Shell to use for command execution (e.g. powershell, bash)")
 			.option("-d, --dry-run", "Print commands without executing them", false)
