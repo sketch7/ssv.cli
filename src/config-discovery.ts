@@ -1,5 +1,4 @@
-import type { Dirent } from "node:fs";
-import { readdirSync } from "node:fs";
+import { readdirSync, type Dirent } from "node:fs";
 import { join, relative } from "node:path";
 
 const YAML_EXTS = [".yaml", ".yml"] as const;
@@ -45,9 +44,9 @@ function trimRedundantSegmentPrefix(name: string): string {
 	const parent = name.slice(0, slashIdx);
 	const stem = name.slice(slashIdx + 1);
 	const parentLeaf = parent.slice(parent.lastIndexOf("/") + 1);
-	const prefix = parentLeaf + ".";
+	const prefix = `${parentLeaf}.`;
 	if (stem.startsWith(prefix) && stem.length > prefix.length) {
-		return parent + "/" + stem.slice(prefix.length);
+		return `${parent}/${stem.slice(prefix.length)}`;
 	}
 	return name;
 }
@@ -86,7 +85,7 @@ export function resolveNames(names: string[], discovered: ConfigEntry[]): Resolv
 		}
 
 		// Prefix match: `ssv` → all entries starting with `ssv/`
-		const prefix = lower + "/";
+		const prefix = `${lower}/`;
 		const prefixMatches = discovered.filter(e => e.name.toLowerCase().startsWith(prefix));
 		if (prefixMatches.length > 0) {
 			for (const entry of prefixMatches) {

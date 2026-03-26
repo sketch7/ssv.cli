@@ -250,7 +250,7 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 		// Concurrency: CLI flag > config > default 5
 		const concurrency = opts.concurrency ?? config.concurrency ?? 5;
 
-		await setupAll(config, rootPath, resolvedShell, opts.dryRun, concurrency);
+		await setupAll(config, { rootPath, concurrency, execution: { shell: resolvedShell, dryRun: opts.dryRun } });
 	}
 
 	consola.success("mass-exec — Complete!");
@@ -268,19 +268,21 @@ type Ctx = Record<string, never>;
  */
 function buildWaveTasks(
 	waves: NormalizedStep[][],
-	shell: string,
-	dryRun: boolean,
+	execution: {
+		shell: string;
+		dryRun: boolean;
+	},
 	localPath: string,
 ): ListrTask<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>[] {
 	const tasks: ListrTask<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>[] = [];
 	for (const wave of waves) {
 		if (wave.length === 1) {
-			const step = wave[0];
+			const [step] = wave;
 			tasks.push({
 				title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
 				task: async (_c, stepTask) => {
-					stepTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
-					if (!dryRun) { await runCommand(shell, step.run, localPath); }
+					stepTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
+					if (!execution.dryRun) { await runCommand(execution.shell, step.run, localPath); }
 				},
 			});
 		} else {
@@ -292,8 +294,8 @@ function buildWaveTasks(
 						wave.map(step => ({
 							title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
 							task: async (_c2: Ctx, stepTask: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
-								stepTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
-								if (!dryRun) { await runCommand(shell, step.run, localPath); }
+								stepTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
+								if (!execution.dryRun) { await runCommand(execution.shell, step.run, localPath); }
 							},
 						})),
 						{ concurrent: true, exitOnError: true },
@@ -309,7 +311,18 @@ function isVerboseRenderer(): boolean {
 	return (consola.level ?? 3) >= 4;
 }
 
-async function setupAll(config: MassCommandsConfig, rootPath: string, shell: string, dryRun: boolean, concurrency: number): Promise<void> {
+async function setupAll(
+	config: MassCommandsConfig,
+	options: {
+		rootPath: string;
+		concurrency: number;
+		execution: {
+			shell: string;
+			dryRun: boolean;
+		};
+	},
+): Promise<void> {
+	const { rootPath, concurrency, execution } = options;
 	const projectTasks = config.projects.map((project: ProjectConfig) => ({
 		title: project.name,
 		task: (_ctx: Ctx, task: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
@@ -339,16 +352,16 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 							if (!urlTemplate) { return; }
 							const url = interpolate(urlTemplate, projectVars);
 							const cmd = `git clone ${url} ${localName}`;
-							subTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd)}` : colors.dim(cmd);
-							if (!dryRun) {
-								await runCommand(shell, cmd, rootPath);
+							subTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd)}` : colors.dim(cmd);
+							if (!execution.dryRun) {
+								await runCommand(execution.shell, cmd, rootPath);
 							}
 						},
 					},
 					// ---- Check dir exists ----
 					{
 						title: "Verify directory",
-						skip: () => dryRun || existsSync(localPath),
+						skip: () => execution.dryRun || existsSync(localPath),
 						task: (_, subTask) => {
 							subTask.skip(`Directory '${localName}' does not exist — skipping steps`);
 						},
@@ -369,7 +382,7 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 								.map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
 
 							const waves = buildStepWaves(globalSteps);
-							return subTask.newListr(buildWaveTasks(waves, shell, dryRun, localPath), { concurrent: false, exitOnError: true });
+							return subTask.newListr(buildWaveTasks(waves, execution, localPath), { concurrent: false, exitOnError: true });
 						},
 					},
 					// ---- Project steps ----
@@ -380,7 +393,7 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 							const steps = (project.steps ?? []).map(normalizeStep).map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
 
 							const waves = buildStepWaves(steps);
-							return subTask.newListr(buildWaveTasks(waves, shell, dryRun, localPath), { concurrent: false, exitOnError: true });
+							return subTask.newListr(buildWaveTasks(waves, execution, localPath), { concurrent: false, exitOnError: true });
 						},
 					},
 				],
