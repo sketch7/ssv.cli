@@ -1,5 +1,4 @@
 import { Command } from "commander";
-import * as v from "valibot";
 import { consola } from "consola";
 import { colors } from "consola/utils";
 import { execa } from "execa";
@@ -9,6 +8,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { platform } from "node:process";
 import { createInterface } from "node:readline/promises";
+import * as v from "valibot";
 import { parse as parseYaml } from "yaml";
 
 import { type ConfigEntry, discoverConfigs, resolveNames } from "../config-discovery";
@@ -72,12 +72,16 @@ export function registerMassExecCommand(program: Command): void {
 				const configRoot = configRootInput || defaultConfigRoot;
 
 				const newSettings: SsvSettings = { ...settings, wsRoot: resolve(wsRoot) };
-				if (configRoot) { newSettings.configRoot = resolve(configRoot); }
+				if (configRoot) {
+					newSettings.configRoot = resolve(configRoot);
+				}
 				writeSettings(newSettings);
 
 				consola.success(`Settings saved to: ${colors.dim(getSettingsPath())}`);
 				consola.info(`  ws-root:     ${colors.dim(resolve(wsRoot))}`);
-				if (configRoot) { consola.info(`  config-root: ${colors.dim(resolve(configRoot))}`); }
+				if (configRoot) {
+					consola.info(`  config-root: ${colors.dim(resolve(configRoot))}`);
+				}
 			} finally {
 				rl.close();
 			}
@@ -134,8 +138,12 @@ export function registerMassExecCommand(program: Command): void {
 }
 
 function resolveBaseRoot(cliRoot?: string, globalWsRoot?: string): string {
-	if (cliRoot) { return resolve(cliRoot); }
-	if (globalWsRoot) { return resolve(globalWsRoot); }
+	if (cliRoot) {
+		return resolve(cliRoot);
+	}
+	if (globalWsRoot) {
+		return resolve(globalWsRoot);
+	}
 	return resolve("./");
 }
 
@@ -282,7 +290,9 @@ function buildWaveTasks(
 				title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
 				task: async (_c, stepTask) => {
 					stepTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
-					if (!execution.dryRun) { await runCommand(execution.shell, step.run, localPath); }
+					if (!execution.dryRun) {
+						await runCommand(execution.shell, step.run, localPath);
+					}
 				},
 			});
 		} else {
@@ -295,7 +305,9 @@ function buildWaveTasks(
 							title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
 							task: async (_c2: Ctx, stepTask: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
 								stepTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
-								if (!execution.dryRun) { await runCommand(execution.shell, step.run, localPath); }
+								if (!execution.dryRun) {
+									await runCommand(execution.shell, step.run, localPath);
+								}
 							},
 						})),
 						{ concurrent: true, exitOnError: true },
@@ -343,13 +355,19 @@ async function setupAll(
 						title: "Clone",
 						skip: () => {
 							const urlTemplate = project.url ?? config.cloneUrlTemplate;
-							if (!urlTemplate) { return "No clone URL"; }
-							if (existsSync(localPath)) { return "Already cloned"; }
+							if (!urlTemplate) {
+								return "No clone URL";
+							}
+							if (existsSync(localPath)) {
+								return "Already cloned";
+							}
 							return false;
 						},
 						task: async (_, subTask) => {
 							const urlTemplate = project.url ?? config.cloneUrlTemplate;
-							if (!urlTemplate) { return; }
+							if (!urlTemplate) {
+								return;
+							}
 							const url = interpolate(urlTemplate, projectVars);
 							const cmd = `git clone ${url} ${localName}`;
 							subTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd)}` : colors.dim(cmd);
@@ -433,7 +451,7 @@ async function runCommand(shell: string, cmd: string, cwd: string): Promise<void
 	try {
 		await execa(shell, [shellFlag, cmd], { cwd, stdio: "pipe" });
 	} catch (err: unknown) {
-		const { exitCode } = (err as { exitCode?: number });
+		const { exitCode } = err as { exitCode?: number };
 		const stderr = (err as { stderr?: string }).stderr ?? "";
 		throw new Error(`Command failed (exit ${exitCode ?? "?"}): ${cmd}${stderr ? `\n${stderr}` : ""}`, { cause: err });
 	}
@@ -450,7 +468,11 @@ async function runCommand(shell: string, cmd: string, cwd: string): Promise<void
  *   3. OS default: powershell on Windows, sh on Unix
  */
 function resolveShell(cliShell?: string, configShell?: string): string {
-	if (cliShell) { return cliShell; }
-	if (configShell) { return configShell; }
+	if (cliShell) {
+		return cliShell;
+	}
+	if (configShell) {
+		return configShell;
+	}
 	return platform === "win32" ? "powershell" : "sh";
 }

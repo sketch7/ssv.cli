@@ -18,7 +18,9 @@ export function discoverConfigs(dir: string): ConfigEntry[] {
 
 	return entries
 		.filter(e => {
-			if (!e.isFile() || !YAML_EXTS.some(ext => e.name.endsWith(ext))) { return false; }
+			if (!e.isFile() || !YAML_EXTS.some(ext => e.name.endsWith(ext))) {
+				return false;
+			}
 			// Exclude common non-config directories
 			const rel = relative(dir, join(e.parentPath, e.name)).replace(/\\/g, "/");
 			return !rel.split("/").some(seg => seg === "node_modules" || seg === ".git");
@@ -40,7 +42,9 @@ export function discoverConfigs(dir: string): ConfigEntry[] {
  */
 function trimRedundantSegmentPrefix(name: string): string {
 	const slashIdx = name.lastIndexOf("/");
-	if (slashIdx === -1) { return name; }
+	if (slashIdx === -1) {
+		return name;
+	}
 	const parent = name.slice(0, slashIdx);
 	const stem = name.slice(slashIdx + 1);
 	const parentLeaf = parent.slice(parent.lastIndexOf("/") + 1);

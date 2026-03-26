@@ -19,7 +19,7 @@ export default defineConfig({
 		"prefer-const": "error",
 		"prefer-template": "error",
 		"sort-keys": "off",
-		"func-style": ["error", "declaration", { "allowArrowFunctions": true }],
+		"func-style": ["error", "declaration", { allowArrowFunctions: true }],
 		eqeqeq: "error",
 		"no-var": "error",
 		"no-console": "off",
@@ -35,18 +35,24 @@ export default defineConfig({
 		"max-statements": ["warn", { max: 40 }],
 		"id-length": "off",
 		"capitalized-comments": "off",
-		"sort-imports": ["warn", {
-			ignoreCase: true,
-			ignoreDeclarationSort: true,
-			ignoreMemberSort: true,
-			memberSyntaxSortOrder: ["none", "all", "multiple", "single"]
-		}],
+		"sort-imports": [
+			"warn",
+			{
+				ignoreCase: true,
+				ignoreDeclarationSort: true,
+				ignoreMemberSort: true,
+				memberSyntaxSortOrder: ["none", "all", "multiple", "single"],
+			},
+		],
 		// "import/extensions": ["error", "always"],
 		"typescript/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
 		"typescript/consistent-type-imports": ["error", { prefer: "type-imports" }],
 		"typescript/no-explicit-any": "warn",
-		"typescript/explicit-function-return-type": ["warn", {
-			allowExpressions: true,
-		}],
+		"typescript/explicit-function-return-type": [
+			"warn",
+			{
+				allowExpressions: true,
+			},
+		],
 	},
 });

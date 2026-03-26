@@ -214,13 +214,13 @@ globalSteps:
     run: pnpm install
   - name: lint
     run: pnpm lint
-    parallel: true  # grouped with adjacent parallel steps → run concurrently
+    parallel: true # grouped with adjacent parallel steps → run concurrently
   - name: typecheck
     run: pnpm typecheck
-    parallel: true  # same wave as lint
+    parallel: true # same wave as lint
   - name: build
     run: pnpm build
-    needs: [restore]  # informational — documents intent
+    needs: [restore] # informational — documents intent
 ```
 
 | Field      | Required | Description                                                                                                    |
