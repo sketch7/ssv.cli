@@ -219,50 +219,68 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 		consola.warn("[dry-run] No commands will be executed");
 	}
 
-	for (const entry of entries) {
-		consola.info(`${colors.dim("Config:")} ${colors.cyan(entry.name)}  ${colors.dim(entry.filePath)}`);
+	const configTasks = entries.map(entry => ({
+		title: `${colors.cyan(entry.name)}  ${colors.dim(entry.filePath)}`,
+		task: (_ctx: Ctx, configTask: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
+			let raw: unknown;
+			try {
+				raw = parseYaml(readFileSync(entry.filePath, "utf8"));
+			} catch (err) {
+				throw new Error(`Failed to parse config: ${entry.filePath}\n${String(err)}`, { cause: err });
+			}
 
-		let raw: unknown;
-		try {
-			raw = parseYaml(readFileSync(entry.filePath, "utf8"));
-		} catch (err) {
-			consola.error(`Failed to parse config: ${entry.filePath}`);
-			consola.error(String(err));
-			process.exit(1);
-		}
-
-		let config: MassCommandsConfig;
-		try {
-			config = v.parse(MassCommandsConfigSchema, raw);
-		} catch (err) {
-			if (err instanceof v.ValiError) {
-				consola.error(`Config validation failed: ${entry.filePath}`);
-				for (const issue of err.issues) {
-					consola.error(`  • ${issue.message} (path: ${issue.path?.map((p: { key: unknown }) => p.key).join(".") ?? "root"})`);
+			let config: MassCommandsConfig;
+			try {
+				config = v.parse(MassCommandsConfigSchema, raw);
+			} catch (err) {
+				if (err instanceof v.ValiError) {
+					const issues = err.issues
+						.map(issue => `  • ${issue.message} (path: ${issue.path?.map((p: { key: unknown }) => p.key).join(".") ?? "root"})`)
+						.join("\n");
+					throw new Error(`Config validation failed: ${entry.filePath}\n${issues}`, { cause: err });
 				}
-			} else {
-				consola.error(String(err));
+				throw err;
 			}
-			process.exit(1);
-		}
 
-		if (opts.project) {
-			const filter = opts.project.toLowerCase();
-			config = { ...config, projects: config.projects.filter(r => r.name.toLowerCase().includes(filter)) };
-			if (!config.projects.length) {
-				consola.warn(`--project filter "${opts.project}" matched no projects — skipping config`);
-				continue;
+			if (opts.project) {
+				const filter = opts.project.toLowerCase();
+				config = { ...config, projects: config.projects.filter(r => r.name.toLowerCase().includes(filter)) };
+				if (!config.projects.length) {
+					configTask.skip(`--project filter "${opts.project}" matched no projects`);
+					return;
+				}
 			}
+
+			const resolvedShell = resolveShell(opts.shell, config.shell);
+			// Per-config wsRoot override (supports {wsRoot} token pointing to the global setting)
+			const rootPath = config.wsRoot ? resolve(interpolate(config.wsRoot, { wsRoot: baseRoot })) : baseRoot;
+
+			// Concurrency: CLI flag > config > default 5
+			const concurrency = opts.concurrency ?? config.concurrency ?? 5;
+
+			return configTask.newListr(buildProjectTasks(config, { rootPath, execution: { shell: resolvedShell, dryRun: opts.dryRun } }), {
+				concurrent: concurrency,
+				exitOnError: false,
+			});
+		},
+	}));
+
+	const renderer = isVerboseRenderer() ? "verbose" : process.stdout.isTTY ? "default" : "simple";
+	const listr = new Listr(configTasks, {
+		concurrent: false,
+		exitOnError: false,
+		renderer,
+		rendererOptions: renderer === "default" ? { collapseSubtasks: false } : {},
+	});
+
+	await listr.run();
+
+	const failures = listr.errors;
+	if (failures.length > 0) {
+		consola.warn(`${failures.length} task(s) encountered errors:`);
+		for (const err of failures) {
+			consola.error(err.message ?? String(err));
 		}
-
-		const resolvedShell = resolveShell(opts.shell, config.shell);
-		// Per-config wsRoot override (supports {wsRoot} token pointing to the global setting)
-		const rootPath = config.wsRoot ? resolve(interpolate(config.wsRoot, { wsRoot: baseRoot })) : baseRoot;
-
-		// Concurrency: CLI flag > config > default 5
-		const concurrency = opts.concurrency ?? config.concurrency ?? 5;
-
-		await setupAll(config, { rootPath, concurrency, execution: { shell: resolvedShell, dryRun: opts.dryRun } });
 	}
 
 	consola.success("mass-exec — Complete!");
@@ -327,18 +345,17 @@ function isVerboseRenderer(): boolean {
 	return (consola.level ?? 3) >= 4;
 }
 
-async function setupAll(
+function buildProjectTasks(
 	config: MassCommandsConfig,
 	options: {
 		rootPath: string;
-		concurrency: number;
 		execution: {
 			shell: string;
 			dryRun: boolean;
 		};
 	},
-): Promise<void> {
-	const { rootPath, concurrency, execution } = options;
+): ListrTask<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>[] {
+	const { rootPath, execution } = options;
 	const projectTasks = config.projects.map((project: ProjectConfig) => ({
 		title: project.name,
 		task: (_ctx: Ctx, task: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
@@ -424,25 +441,7 @@ async function setupAll(
 		},
 	}));
 
-	const renderer = isVerboseRenderer() ? "verbose" : process.stdout.isTTY ? "default" : "simple";
-
-	const listr = new Listr(projectTasks, {
-		concurrent: concurrency,
-		exitOnError: false,
-		renderer,
-		rendererOptions: renderer === "default" ? { collapseSubtasks: false } : {},
-	});
-
-	await listr.run();
-
-	// Summarize any failures
-	const failures = listr.errors;
-	if (failures.length > 0) {
-		consola.warn(`${failures.length} project(s) encountered errors:`);
-		for (const err of failures) {
-			consola.error(err.message ?? String(err));
-		}
-	}
+	return projectTasks;
 }
 
 // ---------------------------------------------------------------------------
