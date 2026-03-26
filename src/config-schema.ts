@@ -1,5 +1,12 @@
 import * as v from "valibot";
 
+export const SHELL_VALUES = ["bash", "pwsh", "node", "sh", "cmd", "powershell"] as const;
+export type ShellValue = (typeof SHELL_VALUES)[number];
+const ShellSchema = v.pipe(
+	v.picklist(SHELL_VALUES),
+	v.description("Shell to use for executing commands. One of: bash | pwsh | node | sh | cmd | powershell"),
+);
+
 const StepSchema = v.object({
 	name: v.pipe(v.string(), v.description("Step identifier")),
 	run: v.pipe(v.string(), v.description("Shell expression to execute. Supports interpolation tokens.")),
@@ -11,6 +18,12 @@ const StepSchema = v.object({
 	),
 	parallel: v.optional(
 		v.pipe(v.boolean(), v.description("When true, this step is grouped with adjacent parallel steps and runs concurrently with them")),
+	),
+	shell: v.optional(
+		v.pipe(
+			ShellSchema,
+			v.description("Shell override for this step. When set, takes precedence over the config-level shell and --shell flag for this step only."),
+		),
 	),
 });
 
@@ -34,7 +47,10 @@ const ProjectSchema = v.object({
 const MassCommandsConfigSchema = v.object({
 	$schema: v.optional(v.string()),
 	clonePrefix: v.optional(v.pipe(v.string(), v.description('Prefix prepended to the local clone folder name, e.g. "@ssv" or "sketch7"'))),
-	shell: v.optional(v.pipe(v.string(), v.description('Shell to use for executing commands, e.g. "powershell", "bash", "sh"'))),
+	shell: v.optional(
+		v.pipe(ShellSchema, v.description("Default shell for this config. Overridden by --shell flag. Inherited by steps unless overridden per-step.")),
+	),
+
 	org: v.optional(v.pipe(v.string(), v.description("Config-level org — used as {org} fallback when project.org is not set"))),
 	cloneUrlTemplate: v.optional(
 		v.pipe(
@@ -77,4 +93,4 @@ export type ProjectConfig = v.InferOutput<typeof ProjectSchema>;
 /** Root configuration for mass-exec */
 export type MassCommandsConfig = v.InferOutput<typeof MassCommandsConfigSchema>;
 
-export { MassCommandsConfigSchema, ProjectSchema, StepSchema };
+export { MassCommandsConfigSchema, ProjectSchema, ShellSchema, StepSchema };

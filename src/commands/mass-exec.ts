@@ -14,13 +14,13 @@ import { parse as parseYaml } from "yaml";
 
 import { discoverConfigs, resolveNames } from "../config-discovery";
 import type { ConfigEntry } from "../config-discovery";
-import { MassCommandsConfigSchema } from "../config-schema.js";
-import type { MassCommandsConfig, ProjectConfig, Step } from "../config-schema.js";
+import { MassCommandsConfigSchema, SHELL_VALUES } from "../config-schema.js";
+import type { MassCommandsConfig, ProjectConfig, ShellValue, Step } from "../config-schema.js";
 import { buildVars, interpolate } from "../interpolate.js";
 import { getSettingsPath, readSettings, writeSettings } from "../settings.js";
 import type { SsvSettings } from "../settings.js";
 
-const SET_KEYS = ["config-root", "ws-root"] as const;
+const SET_KEYS = ["config-root", "ws-root", "shell"] as const;
 type SetKey = (typeof SET_KEYS)[number];
 
 interface RunOptions {
@@ -45,23 +45,31 @@ export default function registerMassExecCommand(program: Command): void {
 				process.exit(1);
 			}
 			const settings = readSettings();
-			const absValue = resolve(value);
 			if ((key as SetKey) === "config-root") {
+				const absValue = resolve(value);
 				if (!existsSync(absValue)) {
 					consola.error(`Directory not found: ${absValue}`);
 					process.exit(1);
 				}
 				writeSettings({ ...settings, configRoot: absValue });
 				consola.success(`config-root set to: ${colors.cyan(absValue)}`);
-			} else {
+			} else if ((key as SetKey) === "ws-root") {
+				const absValue = resolve(value);
 				writeSettings({ ...settings, wsRoot: absValue });
 				consola.success(`ws-root set to: ${colors.cyan(absValue)}`);
+			} else {
+				if (!(SHELL_VALUES as readonly string[]).includes(value)) {
+					consola.error(`Invalid shell "${value}". Valid values: ${SHELL_VALUES.join(", ")}`);
+					process.exit(1);
+				}
+				writeSettings({ ...settings, shell: value as ShellValue });
+				consola.success(`shell set to: ${colors.cyan(value)}`);
 			}
 		});
 
 	massExec
 		.command("setup")
-		.description("Interactive setup: configure ws-root and config-root")
+		.description("Interactive setup: configure ws-root, shell, and config-root")
 		.action(async () => {
 			const settings = readSettings();
 			const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -70,12 +78,16 @@ export default function registerMassExecCommand(program: Command): void {
 				const wsRootInput = (await rl.question(colors.cyan(`Workspace root [${defaultWsRoot}]: `))).trim();
 				const wsRoot = wsRootInput || defaultWsRoot;
 
+				const defaultShell = settings.shell ?? "bash";
+				const shellInput = (await rl.question(colors.cyan(`Shell [${defaultShell}] (${SHELL_VALUES.join("|")}): `))).trim();
+				const shell = (shellInput || defaultShell) as ShellValue;
+
 				const defaultConfigRoot = settings.configRoot ?? "";
 				const configRootPrompt = defaultConfigRoot ? colors.cyan(`Config root [${defaultConfigRoot}]: `) : colors.cyan("Config root: ");
 				const configRootInput = (await rl.question(configRootPrompt)).trim();
 				const configRoot = configRootInput || defaultConfigRoot;
 
-				const newSettings: SsvSettings = { ...settings, wsRoot: resolve(wsRoot) };
+				const newSettings: SsvSettings = { ...settings, wsRoot: resolve(wsRoot), shell };
 				if (configRoot) {
 					newSettings.configRoot = resolve(configRoot);
 				}
@@ -83,6 +95,7 @@ export default function registerMassExecCommand(program: Command): void {
 
 				consola.success(`Settings saved to: ${colors.dim(getSettingsPath())}`);
 				consola.info(`  ws-root:     ${colors.dim(resolve(wsRoot))}`);
+				consola.info(`  shell:       ${colors.dim(shell)}`);
 				if (configRoot) {
 					consola.info(`  config-root: ${colors.dim(resolve(configRoot))}`);
 				}
@@ -160,10 +173,11 @@ interface NormalizedStep {
 	run: string;
 	needs: string[];
 	parallel: boolean;
+	shell?: string;
 }
 
 function normalizeStep(step: Step): NormalizedStep {
-	return { name: step.name, run: step.run, needs: step.needs ?? [], parallel: step.parallel ?? false };
+	return { name: step.name, run: step.run, needs: step.needs ?? [], parallel: step.parallel ?? false, shell: step.shell };
 }
 
 /**
@@ -251,7 +265,7 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 				}
 			}
 
-			const resolvedShell = resolveShell(opts.shell, config.shell);
+			const resolvedShell = resolveShell(opts.shell, config.shell, settings.shell);
 			// Per-config wsRoot override (supports {wsRoot} token pointing to the global setting)
 			const rootPath = config.wsRoot ? resolve(interpolate(config.wsRoot, { wsRoot: baseRoot })) : baseRoot;
 
@@ -309,26 +323,28 @@ function buildWaveTasks(
 		if (wave.length === 1) {
 			const [step] = wave;
 			tasks.push({
-				title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
+				title: `${colors.dim(`[${step.name}]`)}${step.shell ? colors.dim(` (${step.shell})`) : ""} ${colors.white(step.run)}`,
 				task: async (_c, stepTask) => {
+					const stepShell = step.shell ?? execution.shell;
 					stepTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
 					if (!execution.dryRun) {
-						await runCommand(execution.shell, step.run, localPath);
+						await runCommand(stepShell, step.run, localPath);
 					}
 				},
 			});
 		} else {
 			// Parallel wave — nested concurrent listr
 			tasks.push({
-				title: wave.map(s => colors.dim(`[${s.name}]`)).join(" "),
+				title: wave.map(s => `${colors.dim(`[${s.name}]`)}${s.shell ? colors.dim(` (${s.shell})`) : ""}`).join(" "),
 				task: (_c, waveTask) =>
 					waveTask.newListr(
 						wave.map(step => ({
-							title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
+							title: `${colors.dim(`[${step.name}]`)}${step.shell ? colors.dim(` (${step.shell})`) : ""} ${colors.white(step.run)}`,
 							task: async (_c2: Ctx, stepTask: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
+								const stepShell = step.shell ?? execution.shell;
 								stepTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
 								if (!execution.dryRun) {
-									await runCommand(execution.shell, step.run, localPath);
+									await runCommand(stepShell, step.run, localPath);
 								}
 							},
 						})),
@@ -449,10 +465,20 @@ function buildProjectTasks(
 // ---------------------------------------------------------------------------
 
 async function runCommand(shell: string, cmd: string, cwd: string): Promise<void> {
-	const shellFlag = shell.toLowerCase().includes("powershell") || shell.toLowerCase() === "pwsh" ? "-Command" : "-c";
+	const shellLower = shell.toLowerCase();
+	let shellArgs: string[];
+	if (shellLower === "node") {
+		shellArgs = ["-e", cmd];
+	} else if (shellLower === "cmd") {
+		shellArgs = ["/c", cmd];
+	} else if (shellLower.includes("powershell") || shellLower === "pwsh") {
+		shellArgs = ["-Command", cmd];
+	} else {
+		shellArgs = ["-c", cmd];
+	}
 
 	try {
-		await execa(shell, [shellFlag, cmd], { cwd, stdio: "pipe" });
+		await execa(shell, shellArgs, { cwd, stdio: "pipe" });
 	} catch (err: unknown) {
 		const { exitCode } = err as { exitCode?: number };
 		const stderr = (err as { stderr?: string }).stderr ?? "";
@@ -468,14 +494,18 @@ async function runCommand(shell: string, cmd: string, cwd: string): Promise<void
  * Shell resolution order:
  *   1. --shell CLI flag
  *   2. config.shell field
- *   3. OS default: powershell on Windows, sh on Unix
+ *   3. settings shell (~/.ssv/config.json)
+ *   4. OS default: powershell on Windows, sh on Unix
  */
-function resolveShell(cliShell?: string, configShell?: string): string {
+function resolveShell(cliShell?: string, configShell?: string, settingsShell?: string): string {
 	if (cliShell) {
 		return cliShell;
 	}
 	if (configShell) {
 		return configShell;
+	}
+	if (settingsShell) {
+		return settingsShell;
 	}
 	return platform === "win32" ? "powershell" : "sh";
 }
