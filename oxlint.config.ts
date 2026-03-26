@@ -14,6 +14,7 @@ export default defineConfig({
 		restriction: "error",
 	},
 	rules: {
+		// https://oxc.rs/docs/guide/usage/linter/rules.html
 		curly: ["error", "all", "consistent"],
 		"prefer-const": "error",
 		"prefer-template": "error",
