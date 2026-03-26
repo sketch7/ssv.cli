@@ -42,11 +42,11 @@
     "@types/node": "^25.5.0",
     "@types/update-notifier": "^6.0.8",
     "@valibot/to-json-schema": "^1.6.0",
-    "oxfmt": "^0.41.0",
-    "oxlint": "^1.56.0",
-    "tsdown": "^0.21.4",
+    "oxfmt": "^0.42.0",
+    "oxlint": "^1.57.0",
+    "tsdown": "^0.21.5",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   },
   "engines": {
     "node": ">=24"
