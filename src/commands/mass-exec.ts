@@ -2,7 +2,8 @@ import { Command } from "commander";
 import { consola } from "consola";
 import { colors } from "consola/utils";
 import { execa } from "execa";
-import { Listr, type DefaultRenderer, type ListrTask, type ListrTaskWrapper, type SimpleRenderer } from "listr2";
+import type { DefaultRenderer, ListrTask, ListrTaskWrapper, SimpleRenderer } from "listr2";
+import { Listr } from "listr2";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
@@ -11,10 +12,13 @@ import { createInterface } from "node:readline/promises";
 import * as v from "valibot";
 import { parse as parseYaml } from "yaml";
 
-import { type ConfigEntry, discoverConfigs, resolveNames } from "../config-discovery";
-import { type MassCommandsConfig, type ProjectConfig, type Step, MassCommandsConfigSchema } from "../config-schema.js";
+import { discoverConfigs, resolveNames } from "../config-discovery";
+import type { ConfigEntry } from "../config-discovery";
+import { MassCommandsConfigSchema } from "../config-schema.js";
+import type { MassCommandsConfig, ProjectConfig, Step } from "../config-schema.js";
 import { buildVars, interpolate } from "../interpolate.js";
-import { type SsvSettings, getSettingsPath, readSettings, writeSettings } from "../settings.js";
+import { getSettingsPath, readSettings, writeSettings } from "../settings.js";
+import type { SsvSettings } from "../settings.js";
 
 const SET_KEYS = ["config-root", "ws-root"] as const;
 type SetKey = (typeof SET_KEYS)[number];
@@ -27,7 +31,7 @@ interface RunOptions {
 	concurrency: number;
 }
 
-export function registerMassExecCommand(program: Command): void {
+export default function registerMassExecCommand(program: Command): void {
 	const massExec = program.command("mass-exec").description("Clone repositories and execute commands defined in config files");
 
 	massExec

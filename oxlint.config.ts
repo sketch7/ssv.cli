@@ -1,8 +1,7 @@
 import { defineConfig } from "oxlint";
 
 export default defineConfig({
-	// todo: add import
-	plugins: ["typescript"],
+	plugins: ["typescript", "import"],
 	env: {
 		node: true,
 	},
@@ -31,6 +30,7 @@ export default defineConfig({
 		"no-plusplus": "off",
 		"no-magic-numbers": "off",
 		"no-use-before-define": "off",
+		"no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
 		"init-declarations": "off",
 		"max-statements": ["warn", { max: 40 }],
 		"id-length": "off",
@@ -44,7 +44,23 @@ export default defineConfig({
 				memberSyntaxSortOrder: ["none", "all", "multiple", "single"],
 			},
 		],
-		// "import/extensions": ["error", "always"],
+		"import/no-default-export": "off",
+		"import/no-relative-parent-imports": "off",
+		"import/exports-last": "off",
+		"import/no-nodejs-modules": "off",
+		"import/extensions": [
+			"error",
+			{
+				ts: "never",
+				tsx: "never",
+				js: "never",
+				jsx: "never",
+			},
+		],
+		"import/no-namespace": ["error", { ignore: ["valibot"] }],
+		"import/group-exports": "off",
+		"import/no-named-export": "off",
+		// "import/prefer-default-export": "off",
 		"typescript/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
 		"typescript/consistent-type-imports": ["error", { prefer: "type-imports" }],
 		"typescript/no-explicit-any": "warn",

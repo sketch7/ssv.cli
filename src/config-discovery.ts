@@ -1,4 +1,5 @@
-import { readdirSync, type Dirent } from "node:fs";
+import { readdirSync } from "node:fs";
+import type { Dirent } from "node:fs";
 import { join, relative } from "node:path";
 
 const YAML_EXTS = [".yaml", ".yml"] as const;
