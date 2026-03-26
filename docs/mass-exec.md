@@ -17,7 +17,7 @@ ssv mass-exec <subcommand>
 
 ### `mass-exec setup`
 
-Interactive wizard to configure `ws-root` and `config-root` in one step. Pre-fills current values as defaults.
+Interactive wizard to configure `ws-root`, `shell`, and `config-root` in one step. Pre-fills current values as defaults.
 
 ```bash
 ssv mass-exec setup
@@ -29,10 +29,11 @@ ssv mass-exec setup
 
 Persist a setting. Available keys:
 
-| Key           | Description                                            |
-| ------------- | ------------------------------------------------------ |
-| `config-root` | Directory scanned for mass-exec config files           |
-| `ws-root`     | Global workspace root — default dir for project clones |
+| Key           | Description                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| `config-root` | Directory scanned for mass-exec config files                                                |
+| `ws-root`     | Global workspace root — default dir for project clones                                      |
+| `shell`       | Default shell for all configs (`bash` \| `pwsh` \| `node` \| `sh` \| `cmd` \| `powershell`) |
 
 ```bash
 ssv mass-exec set config-root S:/git/my-resource/mass-exec
@@ -71,13 +72,13 @@ ssv mass-exec [run] <names...> [options]
 
 #### Options
 
-| Option               | Alias | Description                                                                                                                  | Default                               |
-| -------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `--project <filter>` | `-p`  | Only process projects whose name contains this string (case-insensitive substring match).                                    |                                       |
-| `--root <path>`      | `-r`  | Override root directory where repositories are cloned. When omitted, uses the global `ws-root` setting (or `./` if not set). |                                       |
-| `--shell <shell>`    | `-s`  | Shell used to execute commands (`powershell`, `pwsh`, `bash`, `sh`, …).                                                      | `powershell` on Windows, `sh` on Unix |
-| `--dry-run`          | `-d`  | Preview all commands with their working directory via the progress renderer — nothing is executed.                           | `false`                               |
-| `--concurrency <n>`  | `-c`  | Number of projects to process in parallel.                                                                                   | `5`                                   |
+| Option               | Alias | Description                                                                                                                                                                         | Default                               |
+| -------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `--project <filter>` | `-p`  | Only process projects whose name contains this string (case-insensitive substring match).                                                                                           |                                       |
+| `--root <path>`      | `-r`  | Override root directory where repositories are cloned. When omitted, uses the global `ws-root` setting (or `./` if not set).                                                        |                                       |
+| `--shell <shell>`    | `-s`  | Shell to use for commands. Valid values: `bash` \| `pwsh` \| `node` \| `sh` \| `cmd` \| `powershell`. Resolution order: `--shell` → config `shell` → settings `shell` → OS default. | `powershell` on Windows, `sh` on Unix |
+| `--dry-run`          | `-d`  | Preview all commands with their working directory via the progress renderer — nothing is executed.                                                                                  | `false`                               |
+| `--concurrency <n>`  | `-c`  | Number of projects to process in parallel.                                                                                                                                          | `5`                                   |
 
 #### Name resolution
 
@@ -178,17 +179,17 @@ globalSteps:
 
 ### Top-level config fields
 
-| Field              | Required | Description                                                                                      |
-| ------------------ | -------- | ------------------------------------------------------------------------------------------------ |
-| `projects`         | ✓        | List of projects to process.                                                                     |
-| `globalSteps`      |          | Steps run for every project (filterable per project via `skipGlobalSteps`).                      |
-| `cloneUrlTemplate` |          | Default clone URL template. Used when `project.url` is not set. Supports interpolation.          |
-| `org`              |          | Default org — fallback for `{org}` interpolation.                                                |
-| `clonePrefix`      |          | Prefix prepended to the local clone folder name (e.g. `@ssv`).                                   |
-| `shell`            |          | Default shell for this config. Overridden by `--shell` flag.                                     |
-| `wsRoot`           |          | Per-config workspace root. Supports `{wsRoot}` token (resolves from the global ws-root setting). |
-| `concurrency`      |          | Number of projects to run concurrently. Overridden by `--concurrency` flag. Default: `5`.        |
-| `vars`             |          | Arbitrary key/value pairs — available in URL and step interpolation.                             |
+| Field              | Required | Description                                                                                                                                                                            |
+| ------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projects`         | ✓        | List of projects to process.                                                                                                                                                           |
+| `globalSteps`      |          | Steps run for every project (filterable per project via `skipGlobalSteps`).                                                                                                            |
+| `cloneUrlTemplate` |          | Default clone URL template. Used when `project.url` is not set. Supports interpolation.                                                                                                |
+| `org`              |          | Default org — fallback for `{org}` interpolation.                                                                                                                                      |
+| `clonePrefix`      |          | Prefix prepended to the local clone folder name (e.g. `@ssv`).                                                                                                                         |
+| `shell`            |          | Default shell for this config. Overridden by `--shell` flag. Valid values: `bash` \| `pwsh` \| `node` \| `sh` \| `cmd` \| `powershell`. Inherited by steps unless overridden per-step. |
+| `wsRoot`           |          | Per-config workspace root. Supports `{wsRoot}` token (resolves from the global ws-root setting).                                                                                       |
+| `concurrency`      |          | Number of projects to run concurrently. Overridden by `--concurrency` flag. Default: `5`.                                                                                              |
+| `vars`             |          | Arbitrary key/value pairs — available in URL and step interpolation.                                                                                                                   |
 
 ### Project fields
 
@@ -223,12 +224,13 @@ globalSteps:
     needs: [restore] # informational — documents intent
 ```
 
-| Field      | Required | Description                                                                                                    |
-| ---------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `name`     | ✓        | Step identifier (used in `skipGlobalSteps`, `needs`, and progress output).                                     |
-| `run`      | ✓        | Shell expression. Supports interpolation tokens.                                                               |
-| `needs`    |          | Names of steps this step conceptually depends on (informational / documented).                                 |
-| `parallel` |          | When `true`, groups this step with adjacent `parallel: true` steps into one concurrent wave. Default: `false`. |
+| Field      | Required | Description                                                                                                                                                                                                                                               |
+| ---------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`     | ✓        | Step identifier (used in `skipGlobalSteps`, `needs`, and progress output).                                                                                                                                                                                |
+| `run`      | ✓        | Shell expression. Supports interpolation tokens.                                                                                                                                                                                                          |
+| `needs`    |          | Names of steps this step conceptually depends on (informational / documented).                                                                                                                                                                            |
+| `parallel` |          | When `true`, groups this step with adjacent `parallel: true` steps into one concurrent wave. Default: `false`.                                                                                                                                            |
+| `shell`    |          | Shell override for this step. Inherits from `--shell` → config `shell` → settings `shell`. Valid values: `bash` \| `pwsh` \| `node` \| `sh` \| `cmd` \| `powershell`. When `shell: node`, the `run` value is executed as inline JavaScript via `node -e`. |
 
 ---
 

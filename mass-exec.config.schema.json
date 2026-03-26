@@ -8,8 +8,9 @@
       "description": "Prefix prepended to the local clone folder name, e.g. \"@ssv\" or \"sketch7\""
     },
     "shell": {
+      "enum": ["bash", "pwsh", "node", "sh", "cmd", "powershell"],
       "type": "string",
-      "description": "Shell to use for executing commands, e.g. \"powershell\", \"bash\", \"sh\""
+      "description": "Default shell for this config. Overridden by --shell flag. Inherited by steps unless overridden per-step."
     },
     "org": {
       "type": "string",
@@ -76,6 +77,11 @@
                 "parallel": {
                   "type": "boolean",
                   "description": "When true, this step is grouped with adjacent parallel steps and runs concurrently with them"
+                },
+                "shell": {
+                  "enum": ["bash", "pwsh", "node", "sh", "cmd", "powershell"],
+                  "type": "string",
+                  "description": "Shell override for this step. When set, takes precedence over the config-level shell and --shell flag for this step only."
                 }
               },
               "required": ["name", "run"]
@@ -110,6 +116,11 @@
           "parallel": {
             "type": "boolean",
             "description": "When true, this step is grouped with adjacent parallel steps and runs concurrently with them"
+          },
+          "shell": {
+            "enum": ["bash", "pwsh", "node", "sh", "cmd", "powershell"],
+            "type": "string",
+            "description": "Shell override for this step. When set, takes precedence over the config-level shell and --shell flag for this step only."
           }
         },
         "required": ["name", "run"]
