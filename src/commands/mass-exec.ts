@@ -2,8 +2,8 @@ import { Command } from "commander";
 import { consola } from "consola";
 import { colors } from "consola/utils";
 import { execa } from "execa";
-import { Listr } from "listr2";
 import type { DefaultRenderer, ListrTask, ListrTaskWrapper, SimpleRenderer } from "listr2";
+import { Listr } from "listr2";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
@@ -12,13 +12,13 @@ import { createInterface } from "node:readline/promises";
 import * as v from "valibot";
 import { parse as parseYaml } from "yaml";
 
-import type { ConfigEntry } from "../config-discovery.js";
-import { discoverConfigs, resolveNames } from "../config-discovery.js";
+import { discoverConfigs, resolveNames } from "../config-discovery";
+import type { ConfigEntry } from "../config-discovery";
 import { MassCommandsConfigSchema } from "../config-schema.js";
 import type { MassCommandsConfig, ProjectConfig, Step } from "../config-schema.js";
 import { buildVars, interpolate } from "../interpolate.js";
-import type { SsvSettings } from "../settings.js";
 import { getSettingsPath, readSettings, writeSettings } from "../settings.js";
+import type { SsvSettings } from "../settings.js";
 
 const SET_KEYS = ["config-root", "ws-root"] as const;
 type SetKey = (typeof SET_KEYS)[number];
@@ -31,7 +31,7 @@ interface RunOptions {
 	concurrency: number;
 }
 
-export function registerMassExecCommand(program: Command): void {
+export default function registerMassExecCommand(program: Command): void {
 	const massExec = program.command("mass-exec").description("Clone repositories and execute commands defined in config files");
 
 	massExec
@@ -76,12 +76,16 @@ export function registerMassExecCommand(program: Command): void {
 				const configRoot = configRootInput || defaultConfigRoot;
 
 				const newSettings: SsvSettings = { ...settings, wsRoot: resolve(wsRoot) };
-				if (configRoot) newSettings.configRoot = resolve(configRoot);
+				if (configRoot) {
+					newSettings.configRoot = resolve(configRoot);
+				}
 				writeSettings(newSettings);
 
 				consola.success(`Settings saved to: ${colors.dim(getSettingsPath())}`);
 				consola.info(`  ws-root:     ${colors.dim(resolve(wsRoot))}`);
-				if (configRoot) consola.info(`  config-root: ${colors.dim(resolve(configRoot))}`);
+				if (configRoot) {
+					consola.info(`  config-root: ${colors.dim(resolve(configRoot))}`);
+				}
 			} finally {
 				rl.close();
 			}
@@ -138,8 +142,12 @@ export function registerMassExecCommand(program: Command): void {
 }
 
 function resolveBaseRoot(cliRoot?: string, globalWsRoot?: string): string {
-	if (cliRoot) return resolve(cliRoot);
-	if (globalWsRoot) return resolve(globalWsRoot);
+	if (cliRoot) {
+		return resolve(cliRoot);
+	}
+	if (globalWsRoot) {
+		return resolve(globalWsRoot);
+	}
 	return resolve("./");
 }
 
@@ -204,57 +212,75 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 		mkdirSync(baseRoot, { recursive: true });
 	}
 
-	consola.info(`${colors.cyan("SSV Toolz")}  ${colors.dim("»")} mass-exec`);
+	consola.info(`${colors.cyan("ssv")} ${colors.dim("»")} mass-exec`);
 	consola.info(`${colors.dim("Root:")} ${baseRoot}`);
 
 	if (opts.dryRun) {
 		consola.warn("[dry-run] No commands will be executed");
 	}
 
-	for (const entry of entries) {
-		consola.info(`${colors.dim("Config:")} ${colors.cyan(entry.name)}  ${colors.dim(entry.filePath)}`);
+	const configTasks = entries.map(entry => ({
+		title: `${colors.cyan(entry.name)}  ${colors.dim(entry.filePath)}`,
+		task: (_ctx: Ctx, configTask: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
+			let raw: unknown;
+			try {
+				raw = parseYaml(readFileSync(entry.filePath, "utf8"));
+			} catch (err) {
+				throw new Error(`Failed to parse config: ${entry.filePath}\n${String(err)}`, { cause: err });
+			}
 
-		let raw: unknown;
-		try {
-			raw = parseYaml(readFileSync(entry.filePath, "utf8"));
-		} catch (err) {
-			consola.error(`Failed to parse config: ${entry.filePath}`);
-			consola.error(String(err));
-			process.exit(1);
-		}
-
-		let config: MassCommandsConfig;
-		try {
-			config = v.parse(MassCommandsConfigSchema, raw);
-		} catch (err) {
-			if (err instanceof v.ValiError) {
-				consola.error(`Config validation failed: ${entry.filePath}`);
-				for (const issue of err.issues) {
-					consola.error(`  • ${issue.message} (path: ${issue.path?.map((p: { key: unknown }) => p.key).join(".") ?? "root"})`);
+			let config: MassCommandsConfig;
+			try {
+				config = v.parse(MassCommandsConfigSchema, raw);
+			} catch (err) {
+				if (err instanceof v.ValiError) {
+					const issues = err.issues
+						.map(issue => `  • ${issue.message} (path: ${issue.path?.map((p: { key: unknown }) => p.key).join(".") ?? "root"})`)
+						.join("\n");
+					throw new Error(`Config validation failed: ${entry.filePath}\n${issues}`, { cause: err });
 				}
-			} else {
-				consola.error(String(err));
+				throw err;
 			}
-			process.exit(1);
-		}
 
-		if (opts.project) {
-			const filter = opts.project.toLowerCase();
-			config = { ...config, projects: config.projects.filter(r => r.name.toLowerCase().includes(filter)) };
-			if (!config.projects.length) {
-				consola.warn(`--project filter "${opts.project}" matched no projects — skipping config`);
-				continue;
+			if (opts.project) {
+				const filter = opts.project.toLowerCase();
+				config = { ...config, projects: config.projects.filter(r => r.name.toLowerCase().includes(filter)) };
+				if (!config.projects.length) {
+					configTask.skip(`--project filter "${opts.project}" matched no projects`);
+					return;
+				}
 			}
+
+			const resolvedShell = resolveShell(opts.shell, config.shell);
+			// Per-config wsRoot override (supports {wsRoot} token pointing to the global setting)
+			const rootPath = config.wsRoot ? resolve(interpolate(config.wsRoot, { wsRoot: baseRoot })) : baseRoot;
+
+			// Concurrency: CLI flag > config > default 5
+			const concurrency = opts.concurrency ?? config.concurrency ?? 5;
+
+			return configTask.newListr(buildProjectTasks(config, { rootPath, execution: { shell: resolvedShell, dryRun: opts.dryRun } }), {
+				concurrent: concurrency,
+				exitOnError: false,
+			});
+		},
+	}));
+
+	const renderer = isVerboseRenderer() ? "verbose" : process.stdout.isTTY ? "default" : "simple";
+	const listr = new Listr(configTasks, {
+		concurrent: false,
+		exitOnError: false,
+		renderer,
+		rendererOptions: renderer === "default" ? { collapseSubtasks: false } : {},
+	});
+
+	await listr.run();
+
+	const failures = listr.errors;
+	if (failures.length > 0) {
+		consola.warn(`${failures.length} task(s) encountered errors:`);
+		for (const err of failures) {
+			consola.error(err.message ?? String(err));
 		}
-
-		const resolvedShell = resolveShell(opts.shell, config.shell);
-		// Per-config wsRoot override (supports {wsRoot} token pointing to the global setting)
-		const rootPath = config.wsRoot ? resolve(interpolate(config.wsRoot, { wsRoot: baseRoot })) : baseRoot;
-
-		// Concurrency: CLI flag > config > default 5
-		const concurrency = opts.concurrency ?? config.concurrency ?? 5;
-
-		await setupAll(config, rootPath, resolvedShell, opts.dryRun, concurrency);
 	}
 
 	consola.success("mass-exec — Complete!");
@@ -272,19 +298,23 @@ type Ctx = Record<string, never>;
  */
 function buildWaveTasks(
 	waves: NormalizedStep[][],
-	shell: string,
-	dryRun: boolean,
+	execution: {
+		shell: string;
+		dryRun: boolean;
+	},
 	localPath: string,
 ): ListrTask<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>[] {
 	const tasks: ListrTask<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>[] = [];
 	for (const wave of waves) {
 		if (wave.length === 1) {
-			const step = wave[0];
+			const [step] = wave;
 			tasks.push({
 				title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
 				task: async (_c, stepTask) => {
-					stepTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
-					if (!dryRun) await runCommand(shell, step.run, localPath);
+					stepTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
+					if (!execution.dryRun) {
+						await runCommand(execution.shell, step.run, localPath);
+					}
 				},
 			});
 		} else {
@@ -296,8 +326,10 @@ function buildWaveTasks(
 						wave.map(step => ({
 							title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
 							task: async (_c2: Ctx, stepTask: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
-								stepTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
-								if (!dryRun) await runCommand(shell, step.run, localPath);
+								stepTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
+								if (!execution.dryRun) {
+									await runCommand(execution.shell, step.run, localPath);
+								}
 							},
 						})),
 						{ concurrent: true, exitOnError: true },
@@ -313,7 +345,17 @@ function isVerboseRenderer(): boolean {
 	return (consola.level ?? 3) >= 4;
 }
 
-async function setupAll(config: MassCommandsConfig, rootPath: string, shell: string, dryRun: boolean, concurrency: number): Promise<void> {
+function buildProjectTasks(
+	config: MassCommandsConfig,
+	options: {
+		rootPath: string;
+		execution: {
+			shell: string;
+			dryRun: boolean;
+		};
+	},
+): ListrTask<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>[] {
+	const { rootPath, execution } = options;
 	const projectTasks = config.projects.map((project: ProjectConfig) => ({
 		title: project.name,
 		task: (_ctx: Ctx, task: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
@@ -334,25 +376,31 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 						title: "Clone",
 						skip: () => {
 							const urlTemplate = project.url ?? config.cloneUrlTemplate;
-							if (!urlTemplate) return "No clone URL";
-							if (existsSync(localPath)) return "Already cloned";
+							if (!urlTemplate) {
+								return "No clone URL";
+							}
+							if (existsSync(localPath)) {
+								return "Already cloned";
+							}
 							return false;
 						},
 						task: async (_, subTask) => {
 							const urlTemplate = project.url ?? config.cloneUrlTemplate;
-							if (!urlTemplate) return;
+							if (!urlTemplate) {
+								return;
+							}
 							const url = interpolate(urlTemplate, projectVars);
 							const cmd = `git clone ${url} ${localName}`;
-							subTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd)}` : colors.dim(cmd);
-							if (!dryRun) {
-								await runCommand(shell, cmd, rootPath);
+							subTask.output = execution.dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd)}` : colors.dim(cmd);
+							if (!execution.dryRun) {
+								await runCommand(execution.shell, cmd, rootPath);
 							}
 						},
 					},
 					// ---- Check dir exists ----
 					{
 						title: "Verify directory",
-						skip: () => dryRun || existsSync(localPath),
+						skip: () => execution.dryRun || existsSync(localPath),
 						task: (_, subTask) => {
 							subTask.skip(`Directory '${localName}' does not exist — skipping steps`);
 						},
@@ -373,7 +421,7 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 								.map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
 
 							const waves = buildStepWaves(globalSteps);
-							return subTask.newListr(buildWaveTasks(waves, shell, dryRun, localPath), { concurrent: false, exitOnError: true });
+							return subTask.newListr(buildWaveTasks(waves, execution, localPath), { concurrent: false, exitOnError: true });
 						},
 					},
 					// ---- Project steps ----
@@ -384,7 +432,7 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 							const steps = (project.steps ?? []).map(normalizeStep).map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
 
 							const waves = buildStepWaves(steps);
-							return subTask.newListr(buildWaveTasks(waves, shell, dryRun, localPath), { concurrent: false, exitOnError: true });
+							return subTask.newListr(buildWaveTasks(waves, execution, localPath), { concurrent: false, exitOnError: true });
 						},
 					},
 				],
@@ -393,25 +441,7 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 		},
 	}));
 
-	const renderer = isVerboseRenderer() ? "verbose" : process.stdout.isTTY ? "default" : "simple";
-
-	const listr = new Listr(projectTasks, {
-		concurrent: concurrency,
-		exitOnError: false,
-		renderer,
-		rendererOptions: renderer === "default" ? { collapseSubtasks: false } : {},
-	});
-
-	await listr.run();
-
-	// Summarize any failures
-	const failures = listr.errors;
-	if (failures.length > 0) {
-		consola.warn(`${failures.length} project(s) encountered errors:`);
-		for (const err of failures) {
-			consola.error(err.message ?? String(err));
-		}
-	}
+	return projectTasks;
 }
 
 // ---------------------------------------------------------------------------
@@ -424,7 +454,7 @@ async function runCommand(shell: string, cmd: string, cwd: string): Promise<void
 	try {
 		await execa(shell, [shellFlag, cmd], { cwd, stdio: "pipe" });
 	} catch (err: unknown) {
-		const exitCode = (err as { exitCode?: number }).exitCode;
+		const { exitCode } = err as { exitCode?: number };
 		const stderr = (err as { stderr?: string }).stderr ?? "";
 		throw new Error(`Command failed (exit ${exitCode ?? "?"}): ${cmd}${stderr ? `\n${stderr}` : ""}`, { cause: err });
 	}
@@ -441,7 +471,11 @@ async function runCommand(shell: string, cmd: string, cwd: string): Promise<void
  *   3. OS default: powershell on Windows, sh on Unix
  */
 function resolveShell(cliShell?: string, configShell?: string): string {
-	if (cliShell) return cliShell;
-	if (configShell) return configShell;
+	if (cliShell) {
+		return cliShell;
+	}
+	if (configShell) {
+		return configShell;
+	}
 	return platform === "win32" ? "powershell" : "sh";
 }

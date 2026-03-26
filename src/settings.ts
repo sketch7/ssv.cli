@@ -35,5 +35,5 @@ export function readSettings(): SsvSettings {
 export function writeSettings(settings: SsvSettings): void {
 	const settingsPath = getSettingsPath();
 	mkdirSync(dirname(settingsPath), { recursive: true });
-	writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf8");
+	writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }

@@ -1,5 +1,5 @@
-import type { Dirent } from "node:fs";
 import { readdirSync } from "node:fs";
+import type { Dirent } from "node:fs";
 import { join, relative } from "node:path";
 
 const YAML_EXTS = [".yaml", ".yml"] as const;
@@ -19,7 +19,9 @@ export function discoverConfigs(dir: string): ConfigEntry[] {
 
 	return entries
 		.filter(e => {
-			if (!e.isFile() || !YAML_EXTS.some(ext => e.name.endsWith(ext))) return false;
+			if (!e.isFile() || !YAML_EXTS.some(ext => e.name.endsWith(ext))) {
+				return false;
+			}
 			// Exclude common non-config directories
 			const rel = relative(dir, join(e.parentPath, e.name)).replace(/\\/g, "/");
 			return !rel.split("/").some(seg => seg === "node_modules" || seg === ".git");
@@ -41,13 +43,15 @@ export function discoverConfigs(dir: string): ConfigEntry[] {
  */
 function trimRedundantSegmentPrefix(name: string): string {
 	const slashIdx = name.lastIndexOf("/");
-	if (slashIdx === -1) return name;
+	if (slashIdx === -1) {
+		return name;
+	}
 	const parent = name.slice(0, slashIdx);
 	const stem = name.slice(slashIdx + 1);
 	const parentLeaf = parent.slice(parent.lastIndexOf("/") + 1);
-	const prefix = parentLeaf + ".";
+	const prefix = `${parentLeaf}.`;
 	if (stem.startsWith(prefix) && stem.length > prefix.length) {
-		return parent + "/" + stem.slice(prefix.length);
+		return `${parent}/${stem.slice(prefix.length)}`;
 	}
 	return name;
 }
@@ -86,7 +90,7 @@ export function resolveNames(names: string[], discovered: ConfigEntry[]): Resolv
 		}
 
 		// Prefix match: `ssv` → all entries starting with `ssv/`
-		const prefix = lower + "/";
+		const prefix = `${lower}/`;
 		const prefixMatches = discovered.filter(e => e.name.toLowerCase().startsWith(prefix));
 		if (prefixMatches.length > 0) {
 			for (const entry of prefixMatches) {
