@@ -96,8 +96,8 @@ ssv mass-exec [run] <names...> [options]
 Config files are **YAML** (`.yaml` or `.yml`). Point your editor at the JSON Schema for completions and validation:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/sketch7/ssv.cli/refs/heads/main/mass-exec.config.schema.json
-$schema: "https://raw.githubusercontent.com/sketch7/ssv.cli/refs/heads/main/mass-exec.config.schema.json"
+# yaml-language-server: $schema=https://raw.githubusercontent.com/sketch7/ssv.cli/refs/heads/v1/mass-exec.config.schema.json
+$schema: "https://raw.githubusercontent.com/sketch7/ssv.cli/refs/heads/v1/mass-exec.config.schema.json"
 
 # Optional: per-config workspace root (projects for this config are cloned here)
 # Supports {wsRoot} token — resolves to the global ws-root setting
