@@ -1,24 +1,20 @@
 import { Command } from "commander";
+import * as v from "valibot";
 import { consola } from "consola";
 import { colors } from "consola/utils";
 import { execa } from "execa";
-import { Listr } from "listr2";
-import type { DefaultRenderer, ListrTask, ListrTaskWrapper, SimpleRenderer } from "listr2";
+import { Listr, type DefaultRenderer, type ListrTask, type ListrTaskWrapper, type SimpleRenderer } from "listr2";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { platform } from "node:process";
 import { createInterface } from "node:readline/promises";
-import * as v from "valibot";
 import { parse as parseYaml } from "yaml";
 
-import type { ConfigEntry } from "../config-discovery.js";
-import { discoverConfigs, resolveNames } from "../config-discovery.js";
-import { MassCommandsConfigSchema } from "../config-schema.js";
-import type { MassCommandsConfig, ProjectConfig, Step } from "../config-schema.js";
+import { type ConfigEntry, discoverConfigs, resolveNames } from "../config-discovery";
+import { type MassCommandsConfig, type ProjectConfig, type Step, MassCommandsConfigSchema } from "../config-schema.js";
 import { buildVars, interpolate } from "../interpolate.js";
-import type { SsvSettings } from "../settings.js";
-import { getSettingsPath, readSettings, writeSettings } from "../settings.js";
+import { type SsvSettings, getSettingsPath, readSettings, writeSettings } from "../settings.js";
 
 const SET_KEYS = ["config-root", "ws-root"] as const;
 type SetKey = (typeof SET_KEYS)[number];
@@ -76,12 +72,12 @@ export function registerMassExecCommand(program: Command): void {
 				const configRoot = configRootInput || defaultConfigRoot;
 
 				const newSettings: SsvSettings = { ...settings, wsRoot: resolve(wsRoot) };
-				if (configRoot) newSettings.configRoot = resolve(configRoot);
+				if (configRoot) { newSettings.configRoot = resolve(configRoot); }
 				writeSettings(newSettings);
 
 				consola.success(`Settings saved to: ${colors.dim(getSettingsPath())}`);
 				consola.info(`  ws-root:     ${colors.dim(resolve(wsRoot))}`);
-				if (configRoot) consola.info(`  config-root: ${colors.dim(resolve(configRoot))}`);
+				if (configRoot) { consola.info(`  config-root: ${colors.dim(resolve(configRoot))}`); }
 			} finally {
 				rl.close();
 			}
@@ -138,8 +134,8 @@ export function registerMassExecCommand(program: Command): void {
 }
 
 function resolveBaseRoot(cliRoot?: string, globalWsRoot?: string): string {
-	if (cliRoot) return resolve(cliRoot);
-	if (globalWsRoot) return resolve(globalWsRoot);
+	if (cliRoot) { return resolve(cliRoot); }
+	if (globalWsRoot) { return resolve(globalWsRoot); }
 	return resolve("./");
 }
 
@@ -284,7 +280,7 @@ function buildWaveTasks(
 				title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
 				task: async (_c, stepTask) => {
 					stepTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
-					if (!dryRun) await runCommand(shell, step.run, localPath);
+					if (!dryRun) { await runCommand(shell, step.run, localPath); }
 				},
 			});
 		} else {
@@ -297,7 +293,7 @@ function buildWaveTasks(
 							title: `${colors.dim(`[${step.name}]`)} ${colors.white(step.run)}`,
 							task: async (_c2: Ctx, stepTask: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
 								stepTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(step.run)}` : colors.dim(step.run);
-								if (!dryRun) await runCommand(shell, step.run, localPath);
+								if (!dryRun) { await runCommand(shell, step.run, localPath); }
 							},
 						})),
 						{ concurrent: true, exitOnError: true },
@@ -334,13 +330,13 @@ async function setupAll(config: MassCommandsConfig, rootPath: string, shell: str
 						title: "Clone",
 						skip: () => {
 							const urlTemplate = project.url ?? config.cloneUrlTemplate;
-							if (!urlTemplate) return "No clone URL";
-							if (existsSync(localPath)) return "Already cloned";
+							if (!urlTemplate) { return "No clone URL"; }
+							if (existsSync(localPath)) { return "Already cloned"; }
 							return false;
 						},
 						task: async (_, subTask) => {
 							const urlTemplate = project.url ?? config.cloneUrlTemplate;
-							if (!urlTemplate) return;
+							if (!urlTemplate) { return; }
 							const url = interpolate(urlTemplate, projectVars);
 							const cmd = `git clone ${url} ${localName}`;
 							subTask.output = dryRun ? `${colors.yellow("(dry-run)")} ${colors.white(cmd)}` : colors.dim(cmd);
@@ -424,7 +420,7 @@ async function runCommand(shell: string, cmd: string, cwd: string): Promise<void
 	try {
 		await execa(shell, [shellFlag, cmd], { cwd, stdio: "pipe" });
 	} catch (err: unknown) {
-		const exitCode = (err as { exitCode?: number }).exitCode;
+		const { exitCode } = (err as { exitCode?: number });
 		const stderr = (err as { stderr?: string }).stderr ?? "";
 		throw new Error(`Command failed (exit ${exitCode ?? "?"}): ${cmd}${stderr ? `\n${stderr}` : ""}`, { cause: err });
 	}
@@ -441,7 +437,7 @@ async function runCommand(shell: string, cmd: string, cwd: string): Promise<void
  *   3. OS default: powershell on Windows, sh on Unix
  */
 function resolveShell(cliShell?: string, configShell?: string): string {
-	if (cliShell) return cliShell;
-	if (configShell) return configShell;
+	if (cliShell) { return cliShell; }
+	if (configShell) { return configShell; }
 	return platform === "win32" ? "powershell" : "sh";
 }
