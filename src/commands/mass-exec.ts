@@ -212,7 +212,7 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 		mkdirSync(baseRoot, { recursive: true });
 	}
 
-	consola.info(`${colors.cyan("SSV Toolz")}  ${colors.dim("»")} mass-exec`);
+	consola.info(`${colors.cyan("ssv")} ${colors.dim("»")} mass-exec`);
 	consola.info(`${colors.dim("Root:")} ${baseRoot}`);
 
 	if (opts.dryRun) {

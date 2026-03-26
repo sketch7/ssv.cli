@@ -7,10 +7,11 @@ export default defineConfig({
 	},
 	categories: {
 		correctness: "error",
+		restriction: "error",
+		perf: "error",
 		suspicious: "warn",
 		style: "warn",
 		pedantic: "off",
-		restriction: "error",
 	},
 	rules: {
 		// https://oxc.rs/docs/guide/usage/linter/rules.html
