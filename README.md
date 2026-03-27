@@ -20,7 +20,7 @@ pnpm add -g @ssv/cli
 ## Getting Started
 
 ```bash
-# 1. Configure workspace root and config directory interactively
+# 1. Configure workspace root, shell, and config directory interactively
 ssv mass-exec setup
 
 # 2. List available configs
@@ -35,7 +35,7 @@ ssv mass-exec ssv/tools
 
 ## Configure
 
-Run the interactive setup wizard to register your workspace root and config directory:
+Run the interactive setup wizard to register your workspace root, shell, and config directory:
 
 ```bash
 ssv mass-exec setup
@@ -45,6 +45,7 @@ Or set each value individually:
 
 ```bash
 ssv mass-exec set ws-root S:/git
+ssv mass-exec set shell bash
 ssv mass-exec set config-root S:/git/my-resource/mass-exec
 ```
 

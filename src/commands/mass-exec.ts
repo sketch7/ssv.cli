@@ -121,6 +121,15 @@ export default function registerMassExecCommand(program: Command): void {
 			consola.info(`${colors.cyan("mass-exec configs")}  ${colors.dim(settings.configRoot)}\n`);
 			for (const entry of configs) {
 				consola.log(`  ${colors.cyan(entry.name)}  ${colors.dim(entry.filePath)}`);
+				try {
+					const raw = parseYaml(readFileSync(entry.filePath, "utf8"));
+					const config = v.parse(MassCommandsConfigSchema, raw);
+					for (const project of config.projects) {
+						consola.log(`    ${colors.dim("·")} ${project.name}`);
+					}
+				} catch {
+					// silently skip unparseable configs
+				}
 			}
 		});
 
