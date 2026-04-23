@@ -1,6 +1,6 @@
 {
   "name": "@ssv/cli",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": false,
   "description": "@ssv developer tooling CLI",
   "license": "MIT",
@@ -39,14 +39,14 @@
     "yaml": "^2.8.3"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.6.0",
     "@types/update-notifier": "^6.0.8",
     "@valibot/to-json-schema": "^1.6.0",
-    "oxfmt": "^0.42.0",
-    "oxlint": "^1.57.0",
-    "tsdown": "^0.21.5",
+    "oxfmt": "^0.46.0",
+    "oxlint": "^1.61.0",
+    "tsdown": "^0.21.10",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   },
   "engines": {
     "node": ">=24"
