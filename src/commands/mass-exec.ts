@@ -278,6 +278,10 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 			// Per-config wsRoot override (supports {wsRoot} token pointing to the global setting)
 			const rootPath = config.wsRoot ? resolve(interpolate(config.wsRoot, { wsRoot: baseRoot })) : baseRoot;
 
+			if (!existsSync(rootPath)) {
+				mkdirSync(rootPath, { recursive: true });
+			}
+
 			// Concurrency: CLI flag > config > default 5
 			const concurrency = opts.concurrency ?? config.concurrency ?? 5;
 
