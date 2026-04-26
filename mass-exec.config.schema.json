@@ -125,7 +125,58 @@
         },
         "required": ["name", "run"]
       },
-      "description": "Steps run for every project (filtered by skipGlobalSteps per project)"
+      "description": "Steps run for every project (filtered by skipGlobalSteps per project). Prefer 'jobs' for named job support."
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Job identifier, e.g. 'setup', 'build', 'create-pr'"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of what this job does"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "description": "Step identifier" },
+                "run": {
+                  "type": "string",
+                  "description": "Shell expression to execute. Supports interpolation tokens."
+                },
+                "needs": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Names of steps that must complete before this one runs (informational — used for validation and documentation)"
+                },
+                "parallel": {
+                  "type": "boolean",
+                  "description": "When true, this step is grouped with adjacent parallel steps and runs concurrently with them"
+                },
+                "shell": {
+                  "enum": ["bash", "pwsh", "node", "sh", "cmd", "powershell"],
+                  "type": "string",
+                  "description": "Shell override for this step. When set, takes precedence over the config-level shell and --shell flag for this step only."
+                }
+              },
+              "required": ["name", "run"]
+            },
+            "description": "Steps to run for each project in this job"
+          }
+        },
+        "required": ["name", "steps"]
+      },
+      "description": "Named jobs, each containing steps run on every project. Select with --job <name>. Falls back to first job or defaultJob when not specified."
+    },
+    "defaultJob": {
+      "type": "string",
+      "description": "Name of the default job to run when --job is not specified. Falls back to the first job by convention if omitted."
     }
   },
   "required": ["projects"]

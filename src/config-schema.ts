@@ -27,6 +27,12 @@ const StepSchema = v.object({
 	),
 });
 
+export const JobSchema = v.object({
+	name: v.pipe(v.string(), v.description("Job identifier, e.g. 'setup', 'build', 'create-pr'")),
+	description: v.optional(v.pipe(v.string(), v.description("Human-readable description of what this job does"))),
+	steps: v.pipe(v.array(StepSchema), v.description("Steps to run for each project in this job")),
+});
+
 const ProjectSchema = v.object({
 	name: v.pipe(v.string(), v.description('Project name, e.g. "ssv-core"')),
 	url: v.optional(
@@ -81,11 +87,27 @@ const MassCommandsConfigSchema = v.object({
 		),
 	),
 	projects: v.pipe(v.array(ProjectSchema), v.description("Projects to process")),
-	globalSteps: v.optional(v.pipe(v.array(StepSchema), v.description("Steps run for every project (filtered by skipGlobalSteps per project)"))),
+	globalSteps: v.optional(
+		v.pipe(v.array(StepSchema), v.description("Steps run for every project (filtered by skipGlobalSteps per project). Prefer 'jobs' for named job support.")),
+	),
+	jobs: v.optional(
+		v.pipe(
+			v.array(JobSchema),
+			v.description(
+				"Named jobs, each containing steps run on every project. Select with --job <name>. Falls back to first job or defaultJob when not specified.",
+			),
+		),
+	),
+	defaultJob: v.optional(
+		v.pipe(v.string(), v.description("Name of the default job to run when --job is not specified. Falls back to the first job by convention if omitted.")),
+	),
 });
 
 /** A step — named shell command with optional parallel grouping and dependency declaration */
 export type Step = v.InferOutput<typeof StepSchema>;
+
+/** A named job containing steps run on every project */
+export type Job = v.InferOutput<typeof JobSchema>;
 
 /** Configuration for a single project entry */
 export type ProjectConfig = v.InferOutput<typeof ProjectSchema>;

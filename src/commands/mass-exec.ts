@@ -15,7 +15,7 @@ import { parse as parseYaml } from "yaml";
 import { discoverConfigs, resolveNames } from "../config-discovery";
 import type { ConfigEntry } from "../config-discovery";
 import { MassCommandsConfigSchema, SHELL_VALUES } from "../config-schema.js";
-import type { MassCommandsConfig, ProjectConfig, ShellValue, Step } from "../config-schema.js";
+import type { Job, MassCommandsConfig, ProjectConfig, ShellValue, Step } from "../config-schema.js";
 import { buildVars, interpolate } from "../interpolate.js";
 import { getSettingsPath, readSettings, writeSettings } from "../settings.js";
 import type { SsvSettings } from "../settings.js";
@@ -29,6 +29,7 @@ interface RunOptions {
 	shell?: string;
 	dryRun: boolean;
 	concurrency: number;
+	job?: string;
 }
 
 export default function registerMassExecCommand(program: Command): void {
@@ -133,6 +134,55 @@ export default function registerMassExecCommand(program: Command): void {
 			}
 		});
 
+	massExec
+		.command("jobs")
+		.description("List jobs defined in one or more mass-exec config(s)")
+		.argument("<names...>", "Config name(s): exact (ssv/arcane), prefix (ssv), or 'all'")
+		.action((names: string[]) => {
+			const settings = readSettings();
+			if (!settings.configRoot) {
+				consola.error("No config root registered. Run: ssv mass-exec set config-root <path>");
+				process.exit(1);
+			}
+			const discovered = discoverConfigs(settings.configRoot);
+			const { resolved, unresolved } = resolveNames(names, discovered);
+			if (unresolved.length) {
+				consola.error(`Could not resolve config(s): ${unresolved.map(n => `"${n}"`).join(", ")}`);
+				consola.info("Run `ssv mass-exec list` to see available configs.");
+				process.exit(1);
+			}
+
+			for (const entry of resolved) {
+				consola.info(`${colors.cyan(entry.name)}  ${colors.dim(entry.filePath)}\n`);
+				try {
+					const raw = parseYaml(readFileSync(entry.filePath, "utf8"));
+					const config = v.parse(MassCommandsConfigSchema, raw);
+
+					if (!config.jobs?.length) {
+						const hint = config.globalSteps?.length ? colors.dim(" (config uses legacy globalSteps)") : "";
+						consola.log(`  ${colors.dim("No jobs defined")}${hint}`);
+						consola.log("");
+						continue;
+					}
+
+					const defaultJobName = config.defaultJob ?? config.jobs[0]?.name;
+					for (const job of config.jobs) {
+						const isDefault = job.name === defaultJobName;
+						const defaultBadge = isDefault ? colors.dim(" (default)") : "";
+						const desc = job.description ? colors.dim(` — ${job.description}`) : "";
+						consola.log(`  ${colors.cyan(job.name)}${defaultBadge}${desc}`);
+						for (const step of job.steps) {
+							const parallelBadge = step.parallel ? colors.dim(" [parallel]") : "";
+							consola.log(`    ${colors.dim("·")} ${step.name}${parallelBadge}  ${colors.dim(step.run)}`);
+						}
+					}
+				} catch {
+					consola.warn(`Could not parse config: ${entry.filePath}`);
+				}
+				consola.log("");
+			}
+		});
+
 	massExec.addCommand(
 		new Command("run")
 			.description("Run one or more mass-exec config(s) by name, prefix, or 'all'")
@@ -140,6 +190,7 @@ export default function registerMassExecCommand(program: Command): void {
 			.option("-p, --project <filter>", "Only run projects whose name contains this string (case-insensitive)")
 			.option("-r, --root <path>", "Override root path where repos are cloned (ignores ws-root setting)")
 			.option("-s, --shell <shell>", "Shell to use for command execution (e.g. powershell, bash)")
+			.option("-j, --job <name>", "Run a specific named job (overrides defaultJob and first-job convention)")
 			.option("-d, --dry-run", "Print commands without executing them", false)
 			.option("-c, --concurrency <n>", "Max projects to process in parallel", "5")
 			.action(async (names: string[], opts: RunOptions) => {
@@ -155,6 +206,26 @@ export default function registerMassExecCommand(program: Command): void {
 					consola.error(`Could not resolve config(s): ${unresolved.map(n => `"${n}"`).join(", ")}`);
 					consola.info("Run `ssv mass-exec list` to see available configs.");
 					process.exit(1);
+				}
+
+				// Early job validation — fail before execution starts
+				if (opts.job) {
+					const jobErrors: string[] = [];
+					for (const entry of resolved) {
+						try {
+							const raw = parseYaml(readFileSync(entry.filePath, "utf8"));
+							const config = v.parse(MassCommandsConfigSchema, raw);
+							if (config.jobs?.length && !config.jobs.find(j => j.name === opts.job)) {
+								jobErrors.push(`  ${colors.cyan(entry.name)}: available jobs: ${config.jobs.map(j => colors.cyan(j.name)).join(", ")}`);
+							}
+						} catch {
+							// parse errors will surface in runMassExec
+						}
+					}
+					if (jobErrors.length) {
+						consola.error(`Job "${opts.job}" not found in:\n${jobErrors.join("\n")}`);
+						process.exit(1);
+					}
 				}
 
 				await runMassExec(resolved, opts, settings);
@@ -224,6 +295,38 @@ function buildStepWaves(steps: NormalizedStep[]): NormalizedStep[][] {
 }
 
 // ---------------------------------------------------------------------------
+// Job resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the job to execute:
+ *   1. --job CLI flag (exact match required)
+ *   2. config.defaultJob
+ *   3. First job by convention
+ * Returns undefined if no jobs are defined, or if jobName is specified but not found.
+ */
+function resolveJob(config: MassCommandsConfig, jobName?: string): Job | undefined {
+	if (!config.jobs?.length) {
+		return;
+	}
+
+	if (jobName) {
+		return config.jobs.find(j => j.name === jobName);
+	}
+
+	if (config.defaultJob) {
+		const found = config.jobs.find(j => j.name === config.defaultJob);
+		if (!found) {
+			consola.warn(`Config defaultJob "${config.defaultJob}" not found — using first job "${config.jobs[0].name}"`);
+			return config.jobs[0];
+		}
+		return found;
+	}
+
+	return config.jobs[0]; // Convention: first job is the default
+}
+
+// ---------------------------------------------------------------------------
 // Main runner
 // ---------------------------------------------------------------------------
 
@@ -237,6 +340,10 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 
 	consola.info(`${colors.cyan("ssv")} ${colors.dim("»")} mass-exec`);
 	consola.info(`${colors.dim("Root:")} ${baseRoot}`);
+
+	if (opts.job) {
+		consola.info(`${colors.dim("Job:")}  ${colors.cyan(opts.job)}`);
+	}
 
 	if (opts.dryRun) {
 		consola.warn("[dry-run] No commands will be executed");
@@ -285,7 +392,14 @@ async function runMassExec(entries: ConfigEntry[], opts: RunOptions, settings: S
 			// Concurrency: CLI flag > config > default 5
 			const concurrency = opts.concurrency ?? config.concurrency ?? 5;
 
-			return configTask.newListr(buildProjectTasks(config, { rootPath, execution: { shell: resolvedShell, dryRun: opts.dryRun } }), {
+			const job = resolveJob(config, opts.job);
+			if (opts.job && !job && config.jobs?.length) {
+				throw new Error(
+					`Job "${opts.job}" not found in config "${entry.name}". Available: ${config.jobs.map(j => colors.cyan(j.name)).join(", ")}`,
+				);
+			}
+
+			return configTask.newListr(buildProjectTasks(config, { rootPath, execution: { shell: resolvedShell, dryRun: opts.dryRun }, job }), {
 				concurrent: concurrency,
 				exitOnError: false,
 			});
@@ -382,9 +496,10 @@ function buildProjectTasks(
 			shell: string;
 			dryRun: boolean;
 		};
+		job?: Job;
 	},
 ): ListrTask<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>[] {
-	const { rootPath, execution } = options;
+	const { rootPath, execution, job } = options;
 	const projectTasks = config.projects.map((project: ProjectConfig) => ({
 		title: project.name,
 		task: (_ctx: Ctx, task: ListrTaskWrapper<Ctx, typeof DefaultRenderer, typeof SimpleRenderer>) => {
@@ -434,22 +549,30 @@ function buildProjectTasks(
 							subTask.skip(`Directory '${localName}' does not exist — skipping steps`);
 						},
 					},
-					// ---- Global steps ----
+					// ---- Job steps / Global steps (legacy) ----
 					{
-						title: "Global steps",
+						title: job ? `${colors.dim("job:")} ${colors.cyan(job.name)}` : "Global steps",
 						skip: () => {
+							if (job) {
+								return job.steps.length === 0 ? `No steps in job "${job.name}"` : false;
+							}
 							const skipSet = new Set(project.skipGlobalSteps ?? []);
 							const globalSteps = (config.globalSteps ?? []).filter(s => !skipSet.has(s.name));
 							return globalSteps.length === 0 ? "No global steps" : false;
 						},
 						task: async (_ctx2, subTask) => {
-							const skipSet = new Set(project.skipGlobalSteps ?? []);
-							const globalSteps = (config.globalSteps ?? [])
-								.map(normalizeStep)
-								.filter(s => !skipSet.has(s.name))
-								.map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
+							let steps: NormalizedStep[];
+							if (job) {
+								steps = job.steps.map(normalizeStep).map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
+							} else {
+								const skipSet = new Set(project.skipGlobalSteps ?? []);
+								steps = (config.globalSteps ?? [])
+									.map(normalizeStep)
+									.filter(s => !skipSet.has(s.name))
+									.map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
+							}
 
-							const waves = buildStepWaves(globalSteps);
+							const waves = buildStepWaves(steps);
 							return subTask.newListr(buildWaveTasks(waves, execution, localPath), { concurrent: false, exitOnError: true });
 						},
 					},
