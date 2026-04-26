@@ -62,6 +62,20 @@ Config names are derived from their path relative to the registered directory, w
 
 ---
 
+### `mass-exec jobs <names...>`
+
+List all jobs defined in one or more configs, including their steps and which job is the default.
+
+```bash
+ssv mass-exec jobs ssv/tools
+ssv mass-exec jobs ssv
+ssv mass-exec jobs all
+```
+
+Accepts the same name resolution as `run` (exact, prefix, or `all`).
+
+---
+
 ### `mass-exec [run] <names...>`
 
 Run one or more configs by name. `run` is the default subcommand and can be omitted.
@@ -77,6 +91,7 @@ ssv mass-exec [run] <names...> [options]
 | `--project <filter>` | `-p`  | Only process projects whose name contains this string (case-insensitive substring match).                                                                                           |                                       |
 | `--root <path>`      | `-r`  | Override root directory where repositories are cloned. When omitted, uses the global `ws-root` setting (or `./` if not set).                                                        |                                       |
 | `--shell <shell>`    | `-s`  | Shell to use for commands. Valid values: `bash` \| `pwsh` \| `node` \| `sh` \| `cmd` \| `powershell`. Resolution order: `--shell` → config `shell` → settings `shell` → OS default. | `powershell` on Windows, `sh` on Unix |
+| `--job <name>`       | `-j`  | Select a named job to run. When omitted, resolves via `defaultJob` → first job (convention) → legacy `globalSteps`.                                                                 |                                       |
 | `--dry-run`          | `-d`  | Preview all commands with their working directory via the progress renderer — nothing is executed.                                                                                  | `false`                               |
 | `--concurrency <n>`  | `-c`  | Number of projects to process in parallel.                                                                                                                                          | `5`                                   |
 
@@ -123,6 +138,37 @@ vars:
 # Optional: number of projects to run concurrently (overridden by --concurrency flag). Default: 5
 concurrency: 3
 
+# Optional: name of the default job to run when --job is not specified.
+# When omitted, the first job in the jobs list is used by convention.
+defaultJob: setup
+
+# Named jobs — each runs its steps on every project.
+# Select with: ssv mass-exec <config> --job <name>
+jobs:
+  - name: setup
+    description: Checkout, pull and prune branches
+    steps:
+      - name: git-checkout
+        run: "git checkout {defaultBranch}"
+      - name: git-pull
+        run: git pull
+      - name: git-prune-branches
+        run: pnpx git-removed-branches --prune
+
+  - name: build
+    description: Install dependencies and build
+    steps:
+      - name: install
+        run: pnpm i
+      - name: build
+        run: pnpm build
+
+  - name: create-pr
+    description: Create a pull request via GitHub CLI
+    steps:
+      - name: pr
+        run: gh pr create --fill
+
 projects:
   - name: ssv-core
     # Optional: overrides config-level cloneUrlTemplate for this project
@@ -131,14 +177,14 @@ projects:
     clonePrefix: "@ssv"
     # Optional: override org for this project only
     org: sketch7
-    # Optional: steps run after globalSteps for this project
+    # Optional: steps run after job steps for this project
     steps:
       - name: npm-install
         run: npm install
       - name: build
         run: npm run build
         needs: [npm-install]
-    # Optional: skip specific globalSteps for this project
+    # Optional: skip specific globalSteps for this project (legacy)
     skipGlobalSteps:
       - git-cleanup-branches
 
@@ -165,16 +211,13 @@ projects:
         run: npm run build
         needs: [restore]
 
-# Optional: run for every project (skippable per project via skipGlobalSteps)
+# Legacy: global steps run for every project (replaced by jobs).
+# Still supported — used when no jobs are defined.
 globalSteps:
   - name: git-checkout
     run: "git checkout {defaultBranch}"
   - name: git-pull
     run: git pull
-  - name: git-fetch-prune
-    run: git fetch --prune origin
-  - name: git-cleanup-branches
-    run: "git branch -vv | grep ': gone]' | awk '{print $1}' | xargs git branch -D"
 ```
 
 ### Top-level config fields
@@ -182,7 +225,9 @@ globalSteps:
 | Field              | Required | Description                                                                                                                                                                            |
 | ------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `projects`         | ✓        | List of projects to process.                                                                                                                                                           |
-| `globalSteps`      |          | Steps run for every project (filterable per project via `skipGlobalSteps`).                                                                                                            |
+| `jobs`             |          | Named jobs — each with a list of steps run on every project. Select at runtime with `--job <name>`. See [Jobs](#jobs).                                                                 |
+| `defaultJob`       |          | Name of the job to run when `--job` is not specified. Falls back to the first job by convention when omitted.                                                                          |
+| `globalSteps`      |          | **Legacy.** Steps run for every project (filterable per project via `skipGlobalSteps`). Prefer `jobs` for new configs.                                                                 |
 | `cloneUrlTemplate` |          | Default clone URL template. Used when `project.url` is not set. Supports interpolation.                                                                                                |
 | `org`              |          | Default org — fallback for `{org}` interpolation.                                                                                                                                      |
 | `clonePrefix`      |          | Prefix prepended to the local clone folder name (e.g. `@ssv`).                                                                                                                         |
@@ -193,21 +238,75 @@ globalSteps:
 
 ### Project fields
 
-| Field             | Required | Description                                                                       |
-| ----------------- | -------- | --------------------------------------------------------------------------------- |
-| `name`            | ✓        | Project name (used as clone folder name, and for `{projectName}` interpolation).  |
-| `url`             |          | Git clone URL. Overrides config-level `cloneUrlTemplate`. Supports interpolation. |
-| `org`             |          | Per-project org override for `{org}` interpolation.                               |
-| `clonePrefix`     |          | Per-project clone prefix override.                                                |
-| `vars`            |          | Per-project variable overrides — merged over config-level `vars`.                 |
-| `steps`           |          | Steps specific to this project, run after `globalSteps`.                          |
-| `skipGlobalSteps` |          | Names of `globalSteps` entries to skip for this project.                          |
+| Field             | Required | Description                                                                                       |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `name`            | ✓        | Project name (used as clone folder name, and for `{projectName}` interpolation).                  |
+| `url`             |          | Git clone URL. Overrides config-level `cloneUrlTemplate`. Supports interpolation.                 |
+| `org`             |          | Per-project org override for `{org}` interpolation.                                               |
+| `clonePrefix`     |          | Per-project clone prefix override.                                                                |
+| `vars`            |          | Per-project variable overrides — merged over config-level `vars`.                                 |
+| `steps`           |          | Steps specific to this project, run after job steps (or `globalSteps` in legacy configs).         |
+| `skipGlobalSteps` |          | Names of `globalSteps` entries to skip for this project (legacy — applies only to `globalSteps`). |
+
+---
+
+## Jobs
+
+Jobs are named groups of steps run on every project. They replace the flat `globalSteps` list and allow selecting different workflows at runtime.
+
+```yaml
+defaultJob: setup
+
+jobs:
+  - name: setup
+    description: Checkout, pull and prune branches
+    steps:
+      - name: git-checkout
+        run: "git checkout {defaultBranch}"
+      - name: git-pull
+        run: git pull
+      - name: git-prune-branches
+        run: pnpx git-removed-branches --prune
+
+  - name: build
+    description: Install dependencies and build
+    steps:
+      - name: install
+        run: pnpm i
+      - name: build
+        run: pnpm build
+
+  - name: create-pr
+    description: Create a pull request via GitHub CLI
+    steps:
+      - name: pr
+        run: gh pr create --fill
+```
+
+### Job fields
+
+| Field         | Required | Description                                                                 |
+| ------------- | -------- | --------------------------------------------------------------------------- |
+| `name`        | ✓        | Job identifier. Used with `--job <name>` and `mass-exec jobs`.              |
+| `description` |          | Human-readable description shown by `mass-exec jobs`.                       |
+| `steps`       | ✓        | Steps to run for each project. Same step format as `globalSteps` / `steps`. |
+
+### Default job resolution order
+
+1. `--job <name>` CLI flag
+2. `config.defaultJob` field
+3. First job in the `jobs` array (convention)
+4. Falls back to legacy `globalSteps` when no `jobs` are defined
+
+### Backward compatibility
+
+`globalSteps` is still supported. When a config has no `jobs`, `globalSteps` is used as before (including `skipGlobalSteps` per project). Prefer `jobs` for new configs.
 
 ---
 
 ## Step format
 
-Both `globalSteps` and `steps` use the same object shape:
+Both job `steps`, `globalSteps`, and per-project `steps` use the same object shape:
 
 ```yaml
 globalSteps:
