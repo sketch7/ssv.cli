@@ -159,8 +159,7 @@ export default function registerMassExecCommand(program: Command): void {
 					const config = v.parse(MassCommandsConfigSchema, raw);
 
 					if (!config.jobs?.length) {
-						const hint = config.globalSteps?.length ? colors.dim(" (config uses legacy globalSteps)") : "";
-						consola.log(`  ${colors.dim("No jobs defined")}${hint}`);
+						consola.log(`  ${colors.dim("No jobs defined")}`);
 						consola.log("");
 						continue;
 					}
@@ -549,44 +548,32 @@ function buildProjectTasks(
 							subTask.skip(`Directory '${localName}' does not exist — skipping steps`);
 						},
 					},
-					// ---- Job steps / Global steps (legacy) ----
-					{
-						title: job ? `${colors.dim("job:")} ${colors.cyan(job.name)}` : "Global steps",
-						skip: () => {
-							if (job) {
-								return job.steps.length === 0 ? `No steps in job "${job.name}"` : false;
-							}
-							const skipSet = new Set(project.skipGlobalSteps ?? []);
-							const globalSteps = (config.globalSteps ?? []).filter(s => !skipSet.has(s.name));
-							return globalSteps.length === 0 ? "No global steps" : false;
-						},
-						task: async (_ctx2, subTask) => {
-							let steps: NormalizedStep[];
-							if (job) {
-								steps = job.steps.map(normalizeStep).map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
-							} else {
-								const skipSet = new Set(project.skipGlobalSteps ?? []);
-								steps = (config.globalSteps ?? [])
-									.map(normalizeStep)
-									.filter(s => !skipSet.has(s.name))
-									.map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
-							}
-
-							const waves = buildStepWaves(steps);
-							return subTask.newListr(buildWaveTasks(waves, execution, localPath), { concurrent: false, exitOnError: true });
-						},
+				// ---- Job steps ----
+				{
+					title: job ? `${colors.dim("job:")} ${colors.cyan(job.name)}` : "Steps",
+					skip: () => {
+						if (!job) { return "No jobs defined"; }
+						const override = project.jobs?.find(j => j.name === job.name);
+						const skipSet = new Set(override?.skipSteps ?? []);
+						const effectiveJobSteps = job.steps.filter(s => !skipSet.has(s.name));
+						const extraSteps = override?.steps ?? [];
+						return effectiveJobSteps.length === 0 && extraSteps.length === 0 ? `No steps in job "${job.name}"` : false;
 					},
-					// ---- Project steps ----
-					{
-						title: "Project steps",
-						skip: () => (!project.steps?.length ? "No project steps" : false),
-						task: async (_, subTask) => {
-							const steps = (project.steps ?? []).map(normalizeStep).map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
-
-							const waves = buildStepWaves(steps);
-							return subTask.newListr(buildWaveTasks(waves, execution, localPath), { concurrent: false, exitOnError: true });
-						},
+					task: async (_ctx2, subTask) => {
+						const override = project.jobs?.find(j => j.name === job?.name);
+						const skipSet = new Set(override?.skipSteps ?? []);
+						const jobSteps = (job?.steps ?? [])
+							.filter(s => !skipSet.has(s.name))
+							.map(normalizeStep)
+							.map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
+						const extraSteps = (override?.steps ?? [])
+							.map(normalizeStep)
+							.map(s => ({ ...s, run: interpolate(s.run, projectVars) }));
+						const steps = [...jobSteps, ...extraSteps];
+						const waves = buildStepWaves(steps);
+						return subTask.newListr(buildWaveTasks(waves, execution, localPath), { concurrent: false, exitOnError: true });
 					},
+				},
 				],
 				{ concurrent: false, exitOnError: false },
 			);

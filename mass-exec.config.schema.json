@@ -59,73 +59,58 @@
             "additionalProperties": { "type": "string" },
             "description": "Per-project variable overrides — merged over config-level vars for this project only"
           },
-          "steps": {
+          "jobs": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "name": { "type": "string", "description": "Step identifier" },
-                "run": {
+                "name": {
                   "type": "string",
-                  "description": "Shell expression to execute. Supports interpolation tokens."
+                  "description": "Job name to match — the override applies when this job is selected"
                 },
-                "needs": {
+                "steps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "string", "description": "Step identifier" },
+                      "run": {
+                        "type": "string",
+                        "description": "Shell expression to execute. Supports interpolation tokens."
+                      },
+                      "needs": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Names of steps that must complete before this one runs (informational — used for validation and documentation)"
+                      },
+                      "parallel": {
+                        "type": "boolean",
+                        "description": "When true, this step is grouped with adjacent parallel steps and runs concurrently with them"
+                      },
+                      "shell": {
+                        "enum": ["bash", "pwsh", "node", "sh", "cmd", "powershell"],
+                        "type": "string",
+                        "description": "Shell override for this step. When set, takes precedence over the config-level shell and --shell flag for this step only."
+                      }
+                    },
+                    "required": ["name", "run"]
+                  },
+                  "description": "Additional steps appended after the job's steps for this project"
+                },
+                "skipSteps": {
                   "type": "array",
                   "items": { "type": "string" },
-                  "description": "Names of steps that must complete before this one runs (informational — used for validation and documentation)"
-                },
-                "parallel": {
-                  "type": "boolean",
-                  "description": "When true, this step is grouped with adjacent parallel steps and runs concurrently with them"
-                },
-                "shell": {
-                  "enum": ["bash", "pwsh", "node", "sh", "cmd", "powershell"],
-                  "type": "string",
-                  "description": "Shell override for this step. When set, takes precedence over the config-level shell and --shell flag for this step only."
+                  "description": "Names of job steps to skip for this project"
                 }
               },
-              "required": ["name", "run"]
+              "required": ["name"]
             },
-            "description": "Steps specific to this project, run after global steps"
-          },
-          "skipGlobalSteps": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Names of globalSteps entries to skip for this project"
+            "description": "Per-job overrides — each entry matches a job by name and can skip steps or append extra steps"
           }
         },
         "required": ["name"]
       },
       "description": "Projects to process"
-    },
-    "globalSteps": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "name": { "type": "string", "description": "Step identifier" },
-          "run": {
-            "type": "string",
-            "description": "Shell expression to execute. Supports interpolation tokens."
-          },
-          "needs": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Names of steps that must complete before this one runs (informational — used for validation and documentation)"
-          },
-          "parallel": {
-            "type": "boolean",
-            "description": "When true, this step is grouped with adjacent parallel steps and runs concurrently with them"
-          },
-          "shell": {
-            "enum": ["bash", "pwsh", "node", "sh", "cmd", "powershell"],
-            "type": "string",
-            "description": "Shell override for this step. When set, takes precedence over the config-level shell and --shell flag for this step only."
-          }
-        },
-        "required": ["name", "run"]
-      },
-      "description": "Steps run for every project (filtered by skipGlobalSteps per project). Prefer 'jobs' for named job support."
     },
     "jobs": {
       "type": "array",

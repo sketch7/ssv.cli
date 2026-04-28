@@ -1,6 +1,6 @@
 # mass-exec — Full Reference
 
-Clone a set of git repositories and run shell commands against each one — global steps (shared) and per-project steps — running concurrently. A Node.js replacement for the PowerShell `git-mass-commands.ps1` script.
+Clone a set of git repositories and run shell commands against each one — steps run per job, with optional per-project overrides — running concurrently. A Node.js replacement for the PowerShell `git-mass-commands.ps1` script.
 
 ```
 ssv mass-exec <subcommand>
@@ -91,7 +91,7 @@ ssv mass-exec [run] <names...> [options]
 | `--project <filter>` | `-p`  | Only process projects whose name contains this string (case-insensitive substring match).                                                                                           |                                       |
 | `--root <path>`      | `-r`  | Override root directory where repositories are cloned. When omitted, uses the global `ws-root` setting (or `./` if not set).                                                        |                                       |
 | `--shell <shell>`    | `-s`  | Shell to use for commands. Valid values: `bash` \| `pwsh` \| `node` \| `sh` \| `cmd` \| `powershell`. Resolution order: `--shell` → config `shell` → settings `shell` → OS default. | `powershell` on Windows, `sh` on Unix |
-| `--job <name>`       | `-j`  | Select a named job to run. When omitted, resolves via `defaultJob` → first job (convention) → legacy `globalSteps`.                                                                 |                                       |
+| `--job <name>`       | `-j`  | Select a named job to run. When omitted, resolves via `defaultJob` → first job (convention).                                                                                        |                                       |
 | `--dry-run`          | `-d`  | Preview all commands with their working directory via the progress renderer — nothing is executed.                                                                                  | `false`                               |
 | `--concurrency <n>`  | `-c`  | Number of projects to process in parallel.                                                                                                                                          | `5`                                   |
 
@@ -177,16 +177,17 @@ projects:
     clonePrefix: "@ssv"
     # Optional: override org for this project only
     org: sketch7
-    # Optional: steps run after job steps for this project
-    steps:
-      - name: npm-install
-        run: npm install
+    # Optional: per-job overrides for this project
+    jobs:
+      - name: setup
+        # Skip specific steps from the setup job for this project
+        skipSteps:
+          - git-prune-branches
       - name: build
-        run: npm run build
-        needs: [npm-install]
-    # Optional: skip specific globalSteps for this project (legacy)
-    skipGlobalSteps:
-      - git-cleanup-branches
+        # Extra steps appended after the build job's steps for this project
+        steps:
+          - name: post-build
+            run: npm run verify
 
   # url omitted — cloneUrlTemplate is used automatically
   - name: ssv-tools
@@ -197,27 +198,22 @@ projects:
       defaultBranch: master
 
   - name: app
-    # Steps with parallel grouping and needs-based ordering:
-    steps:
-      - name: restore
-        run: npm install
-      - name: lint
-        run: npm run lint
-        parallel: true
-      - name: test
-        run: npm test
-        parallel: true
+    # Per-job overrides with extra steps for this project:
+    jobs:
       - name: build
-        run: npm run build
-        needs: [restore]
+        steps:
+          - name: restore
+            run: npm install
+          - name: lint
+            run: npm run lint
+            parallel: true
+          - name: test
+            run: npm test
+            parallel: true
+          - name: build-app
+            run: npm run build
+            needs: [restore]
 
-# Legacy: global steps run for every project (replaced by jobs).
-# Still supported — used when no jobs are defined.
-globalSteps:
-  - name: git-checkout
-    run: "git checkout {defaultBranch}"
-  - name: git-pull
-    run: git pull
 ```
 
 ### Top-level config fields
@@ -227,7 +223,6 @@ globalSteps:
 | `projects`         | ✓        | List of projects to process.                                                                                                                                                           |
 | `jobs`             |          | Named jobs — each with a list of steps run on every project. Select at runtime with `--job <name>`. See [Jobs](#jobs).                                                                 |
 | `defaultJob`       |          | Name of the job to run when `--job` is not specified. Falls back to the first job by convention when omitted.                                                                          |
-| `globalSteps`      |          | **Legacy.** Steps run for every project (filterable per project via `skipGlobalSteps`). Prefer `jobs` for new configs.                                                                 |
 | `cloneUrlTemplate` |          | Default clone URL template. Used when `project.url` is not set. Supports interpolation.                                                                                                |
 | `org`              |          | Default org — fallback for `{org}` interpolation.                                                                                                                                      |
 | `clonePrefix`      |          | Prefix prepended to the local clone folder name (e.g. `@ssv`).                                                                                                                         |
@@ -245,14 +240,13 @@ globalSteps:
 | `org`             |          | Per-project org override for `{org}` interpolation.                                               |
 | `clonePrefix`     |          | Per-project clone prefix override.                                                                |
 | `vars`            |          | Per-project variable overrides — merged over config-level `vars`.                                 |
-| `steps`           |          | Steps specific to this project, run after job steps (or `globalSteps` in legacy configs).         |
-| `skipGlobalSteps` |          | Names of `globalSteps` entries to skip for this project (legacy — applies only to `globalSteps`). |
+| `jobs`            |          | Per-job overrides — list of `{ name, steps?, skipSteps? }`. `steps` are appended after the job's steps; `skipSteps` filters job steps by name. |
 
 ---
 
 ## Jobs
 
-Jobs are named groups of steps run on every project. They replace the flat `globalSteps` list and allow selecting different workflows at runtime.
+Jobs are named groups of steps run on every project. Each job has a name, an optional description, and a list of steps run on every project. Select a job at runtime with `--job <name>`.
 
 ```yaml
 defaultJob: setup
@@ -289,43 +283,101 @@ jobs:
 | ------------- | -------- | --------------------------------------------------------------------------- |
 | `name`        | ✓        | Job identifier. Used with `--job <name>` and `mass-exec jobs`.              |
 | `description` |          | Human-readable description shown by `mass-exec jobs`.                       |
-| `steps`       | ✓        | Steps to run for each project. Same step format as `globalSteps` / `steps`. |
+| `steps`       | ✓        | Steps to run for each project.                                               |
+
+### Per-project job overrides
+
+Each project can customise how a named job runs by adding a `jobs` list. Each entry matches a job by name and supports two overrides:
+
+- **`skipSteps`** — names of steps from the job to skip for this project only
+- **`steps`** — extra steps appended after the job's (filtered) steps for this project
+
+```yaml
+projects:
+  - name: ssv-core
+    jobs:
+      - name: setup
+        skipSteps:
+          - git-prune-branches   # skip this step for ssv-core only
+      - name: build
+        steps:
+          - name: post-build     # run this extra step after the build job's steps
+            run: npm run verify
+```
+
+#### ProjectJobOverride fields
+
+| Field       | Required | Description                                                                   |
+| ----------- | -------- | ----------------------------------------------------------------------------- |
+| `name`      | ✓        | Job name to match. Must correspond to a job defined in `jobs`.               |
+| `skipSteps` |          | Names of steps from this job to skip for this project.                        |
+| `steps`     |          | Additional steps appended after the job's (filtered) steps for this project.  |
+
+---
+
+### Per-project job overrides
+
+Each project can customise how a named job runs by adding a `jobs` list. Each entry matches a job by name and supports:
+
+- **`skipSteps`** — names of steps from the job to skip for this project only
+- **`steps`** — extra steps appended after the job's (filtered) steps for this project
+
+```yaml
+projects:
+  - name: ssv-core
+    jobs:
+      - name: setup
+        skipSteps:
+          - git-prune-branches   # skip this step for ssv-core only
+      - name: build
+        steps:
+          - name: post-build     # run this extra step after the build job's steps
+            run: npm run verify
+```
+
+#### ProjectJobOverride fields
+
+| Field       | Required | Description                                                                  |
+| ----------- | -------- | ---------------------------------------------------------------------------- |
+| `name`      | ✓        | Job name to match. Must correspond to a job defined in `jobs`.              |
+| `skipSteps` |          | Names of steps from this job to skip for this project.                       |
+| `steps`     |          | Additional steps appended after the job's (filtered) steps for this project. |
+
+---
 
 ### Default job resolution order
 
 1. `--job <name>` CLI flag
 2. `config.defaultJob` field
 3. First job in the `jobs` array (convention)
-4. Falls back to legacy `globalSteps` when no `jobs` are defined
 
-### Backward compatibility
-
-`globalSteps` is still supported. When a config has no `jobs`, `globalSteps` is used as before (including `skipGlobalSteps` per project). Prefer `jobs` for new configs.
 
 ---
 
 ## Step format
 
-Both job `steps`, `globalSteps`, and per-project `steps` use the same object shape:
+Both job `steps` and per-project job override `steps` use the same object shape:
 
 ```yaml
-globalSteps:
-  - name: restore
-    run: pnpm install
-  - name: lint
-    run: pnpm lint
-    parallel: true # grouped with adjacent parallel steps → run concurrently
-  - name: typecheck
-    run: pnpm typecheck
-    parallel: true # same wave as lint
+jobs:
   - name: build
-    run: pnpm build
-    needs: [restore] # informational — documents intent
+    steps:
+      - name: restore
+        run: pnpm install
+      - name: lint
+        run: pnpm lint
+        parallel: true # grouped with adjacent parallel steps → run concurrently
+      - name: typecheck
+        run: pnpm typecheck
+        parallel: true # same wave as lint
+      - name: build
+        run: pnpm build
+        needs: [restore] # informational — documents intent
 ```
 
 | Field      | Required | Description                                                                                                                                                                                                                                               |
 | ---------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`     | ✓        | Step identifier (used in `skipGlobalSteps`, `needs`, and progress output).                                                                                                                                                                                |
+| `name`     | ✓        | Step identifier (used in `skipSteps`, `needs`, and progress output).                                                                                                                                                                                |
 | `run`      | ✓        | Shell expression. Supports interpolation tokens.                                                                                                                                                                                                          |
 | `needs`    |          | Names of steps this step conceptually depends on (informational / documented).                                                                                                                                                                            |
 | `parallel` |          | When `true`, groups this step with adjacent `parallel: true` steps into one concurrent wave. Default: `false`.                                                                                                                                            |
