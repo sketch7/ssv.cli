@@ -60,8 +60,7 @@ scripts/
 - Steps are defined as `StepSchema` objects: `{ name, run, needs?, parallel? }` — no shorthand form.
 - `parallel: true` on consecutive steps groups them into a concurrent wave; non-parallel steps run sequentially.
 - Use `normalizeStep(step)` to convert a `Step` to `NormalizedStep { name, run, needs, parallel }` inside commands.
-- `globalSteps` / `steps` replace the old `globalCommands` / `commands` fields.
-- `skipGlobalSteps` replaces the old `skipGlobalCommands` field (per-project step filtering).
+- `jobs` define all project-wide steps; per-project overrides use `project.jobs[].skipSteps` (to skip a job's steps) and `project.jobs[].steps` (to append extra steps).
 
 ### Output colors (`consola/utils`)
 
