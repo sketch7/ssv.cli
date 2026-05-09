@@ -29,8 +29,11 @@ ssv mass-exec list
 # 3. Preview a run (dry-run)
 ssv mass-exec ssv/tools --dry-run
 
-# 4. Run it
+# 4. Run it (uses the default job)
 ssv mass-exec ssv/tools
+
+# 5. Run a specific job
+ssv mass-exec ssv/tools --job build
 ```
 
 ## Configure
@@ -57,7 +60,7 @@ Settings are persisted to `~/.ssv/config.json`.
 # List all available configs
 ssv mass-exec list
 
-# Run a single config
+# Run a single config (uses the default job)
 ssv mass-exec ssv/tools
 
 # Dry-run — preview commands without executing
@@ -65,6 +68,12 @@ ssv mass-exec ssv/tools --dry-run
 
 # Filter to a single project within a config
 ssv mass-exec ssv/tools --project ssv.cli
+
+# Run a specific job
+ssv mass-exec ssv/tools --job build
+
+# List all jobs defined in a config
+ssv mass-exec jobs ssv/tools
 
 # Run multiple configs
 ssv mass-exec ssv/tools ssv/arcane bssn/fe

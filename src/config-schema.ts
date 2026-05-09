@@ -27,6 +27,22 @@ const StepSchema = v.object({
 	),
 });
 
+export const JobSchema = v.object({
+	name: v.pipe(v.string(), v.description("Job identifier, e.g. 'setup', 'build', 'create-pr'")),
+	description: v.optional(v.pipe(v.string(), v.description("Human-readable description of what this job does"))),
+	steps: v.pipe(v.array(StepSchema), v.description("Steps to run for each project in this job")),
+});
+
+const ProjectJobOverrideSchema = v.object({
+	name: v.pipe(v.string(), v.description("Job name to match — the override applies when this job is selected")),
+	steps: v.optional(
+		v.pipe(v.array(StepSchema), v.description("Additional steps appended after the job's steps for this project")),
+	),
+	skipSteps: v.optional(
+		v.pipe(v.array(v.string()), v.description("Names of job steps to skip for this project")),
+	),
+});
+
 const ProjectSchema = v.object({
 	name: v.pipe(v.string(), v.description('Project name, e.g. "ssv-core"')),
 	url: v.optional(
@@ -40,8 +56,12 @@ const ProjectSchema = v.object({
 	vars: v.optional(
 		v.pipe(v.record(v.string(), v.string()), v.description("Per-project variable overrides — merged over config-level vars for this project only")),
 	),
-	steps: v.optional(v.pipe(v.array(StepSchema), v.description("Steps specific to this project, run after global steps"))),
-	skipGlobalSteps: v.optional(v.pipe(v.array(v.string()), v.description("Names of globalSteps entries to skip for this project"))),
+	jobs: v.optional(
+		v.pipe(
+			v.array(ProjectJobOverrideSchema),
+			v.description("Per-job overrides — each entry matches a job by name and can skip steps or append extra steps"),
+		),
+	),
 });
 
 const MassCommandsConfigSchema = v.object({
@@ -81,11 +101,27 @@ const MassCommandsConfigSchema = v.object({
 		),
 	),
 	projects: v.pipe(v.array(ProjectSchema), v.description("Projects to process")),
-	globalSteps: v.optional(v.pipe(v.array(StepSchema), v.description("Steps run for every project (filtered by skipGlobalSteps per project)"))),
+	jobs: v.optional(
+		v.pipe(
+			v.array(JobSchema),
+			v.description(
+				"Named jobs, each containing steps run on every project. Select with --job <name>. Falls back to first job or defaultJob when not specified.",
+			),
+		),
+	),
+	defaultJob: v.optional(
+		v.pipe(v.string(), v.description("Name of the default job to run when --job is not specified. Falls back to the first job by convention if omitted.")),
+	),
 });
 
 /** A step — named shell command with optional parallel grouping and dependency declaration */
 export type Step = v.InferOutput<typeof StepSchema>;
+
+/** A named job containing steps run on every project */
+export type Job = v.InferOutput<typeof JobSchema>;
+
+/** Per-job override for a single project */
+export type ProjectJobOverride = v.InferOutput<typeof ProjectJobOverrideSchema>;
 
 /** Configuration for a single project entry */
 export type ProjectConfig = v.InferOutput<typeof ProjectSchema>;
@@ -93,4 +129,4 @@ export type ProjectConfig = v.InferOutput<typeof ProjectSchema>;
 /** Root configuration for mass-exec */
 export type MassCommandsConfig = v.InferOutput<typeof MassCommandsConfigSchema>;
 
-export { MassCommandsConfigSchema, ProjectSchema, ShellSchema, StepSchema };
+export { MassCommandsConfigSchema, ProjectJobOverrideSchema, ProjectSchema, ShellSchema, StepSchema };
