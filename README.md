@@ -5,7 +5,7 @@
 [![GitHub license](https://img.shields.io/github/license/sketch7/ssv.cli)](https://github.com/sketch7/ssv.cli/blob/main/LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/sketch7/ssv.cli)](https://github.com/sketch7/ssv.cli/issues)
 
-`@ssv/cli` (`ssv`) — developer tooling CLI. Clone multiple git repos and run global + per-repo shell commands concurrently.
+`@ssv/cli` (`ssv`) — developer tooling CLI for local package linking and concurrent multi-repository commands.
 
 ## Installation
 
@@ -18,6 +18,27 @@ pnpm add -g @ssv/cli
 ```
 
 ## Getting Started
+
+### Link local libraries
+
+```bash
+# 1. Create a shared starter configuration
+ssv link init
+
+# 2. Add source roots and package names to .ssv-links.yaml
+
+# 3. Preview the reconciliation
+ssv link --dry-run
+
+# 4. Link packages and restore packages removed from the config
+ssv link
+```
+
+`ssv link` supports pnpm repositories, including consumers inside pnpm's virtual store. It backs up installed targets, links them to local package directories, and restores them when removed from the configuration. It does not modify package manifests or lockfiles.
+
+> See [docs/link.md](docs/link.md) for configuration fields, build detection, safety, and recovery guidance.
+
+### Run commands across repositories
 
 ```bash
 # 1. Configure workspace root, shell, and config directory interactively
@@ -118,6 +139,15 @@ pnpm dev -- mass-exec list
 
 # Type-check
 pnpm typecheck
+
+# Run tests once
+pnpm test
+
+# Run tests in watch mode
+pnpm test:watch
+
+# Run tests with V8 coverage
+pnpm test:coverage
 
 # Lint
 pnpm lint

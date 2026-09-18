@@ -40,6 +40,7 @@ npm-debug.log
 .claude/skills/
 agent/
 .superpowers
+.playwright-mcp
 
 
 # misc

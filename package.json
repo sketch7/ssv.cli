@@ -20,6 +20,9 @@
     "build": "tsdown",
     "dev": "tsdown -w",
     "start": "node dist/cli.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "gen-schema": "node scripts/gen-schema.ts",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
@@ -42,14 +45,16 @@
     "@types/node": "^26.1.2",
     "@types/update-notifier": "^6.0.8",
     "@valibot/to-json-schema": "^1.7.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "oxfmt": "^0.61.0",
     "oxlint": "^1.76.0",
     "oxlint-tsgolint": "^7.0.2001",
     "tsdown": "^0.22.14",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@11.18.0"
+  "packageManager": "pnpm@11.19.0"
 }

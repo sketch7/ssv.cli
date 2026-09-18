@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "links": {
+      "type": "object",
+      "propertyNames": { "type": "string", "minLength": 1 },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "build": {
+            "type": "string",
+            "minLength": 1,
+            "description": "pnpm, Nx, or Turbo build target",
+            "default": "build"
+          },
+          "output": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Package-relative build output path",
+            "default": "dist"
+          },
+          "packages": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^(?:@[a-z0-9][a-z0-9._~-]*\\/)?[a-z0-9][a-z0-9._~-]*$"
+                },
+                "description": "npm package names to link from this source root"
+              },
+              { "type": "null" }
+            ],
+            "default": []
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "description": "Source roots and packages to link into this repository",
+      "default": {}
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

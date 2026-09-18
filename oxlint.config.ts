@@ -49,6 +49,7 @@ export default defineConfig({
 			},
 		],
 		"import/no-default-export": "off",
+		"import/prefer-default-export": "off",
 		"import/no-relative-parent-imports": "off",
 		"import/exports-last": "off",
 		"import/no-nodejs-modules": "off",

@@ -15,11 +15,14 @@ pnpm lint             # oxlint .
 pnpm lint:fix         # oxlint --fix .
 pnpm fmt              # oxfmt .
 pnpm fmt:check        # oxfmt . --check
+pnpm test             # Run Vitest once
+pnpm test:watch       # Run Vitest in watch mode
+pnpm test:coverage    # Run Vitest with V8 coverage
 
 pnpm gen-schema       # Regenerate mass-exec.config.schema.json from config-schema.ts
 ```
 
-There is no test suite/`test` script in this repo currently — verify changes via `pnpm typecheck`, `pnpm lint`, and manual runs (`pnpm dev -- mass-exec ...`).
+Link-command tests are colocated with their TypeScript modules under `src/link` and `src/commands`. Verify changes with focused Vitest runs while developing, then run `pnpm test`, `pnpm typecheck`, `pnpm lint`, and the relevant manual CLI command.
 
 > **After modifying `src/config-schema.ts`**, always run `pnpm gen-schema` to keep `mass-exec.config.schema.json` in sync — it is auto-generated, never edit it manually.
 

@@ -4,6 +4,7 @@ import { consola } from "consola";
 import updateNotifier from "update-notifier";
 
 import pkg from "../package.json" with { type: "json" };
+import registerLinkCommand from "./commands/link";
 import registerMassExecCommand from "./commands/mass-exec";
 
 // Non-blocking update check — shows notification on next run if an update is available
@@ -28,5 +29,6 @@ program
 	});
 
 registerMassExecCommand(program);
+registerLinkCommand(program);
 
 await program.parseAsync(process.argv);
