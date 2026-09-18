@@ -14,7 +14,7 @@
     ],
     "newlinesBetween": true
   },
-  "ignorePatterns": ["dist/**", "coverage/**", "*.lock", "pnpm-lock.yaml"],
+  "ignorePatterns": ["dist/**", "coverage/**", ".agents/skills/**", "*.lock", "pnpm-lock.yaml"],
   "overrides": [
     {
       "files": ["**/*.json", "**/*.jsonc", "**/*.md"],

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "arcane-conventional-commit": {
+      "source": "sketch7/arcane.archives",
+      "sourceType": "github",
+      "skillPath": "skills/arcane-conventional-commit/SKILL.md",
+      "computedHash": "8d806a0151c155345085179b053aa62bbfbd2d6781a5c7d5eab2200f89497c17"
+    },
+    "arcane-docs-style": {
+      "source": "sketch7/arcane.archives",
+      "sourceType": "github",
+      "skillPath": "skills/arcane-docs-style/SKILL.md",
+      "computedHash": "39a0cebb9dd2b3dbdab05414f394bbe224fc3747842ca038142c8acab7941244"
+    },
+    "arcane-testing-principles": {
+      "source": "sketch7/arcane.archives",
+      "sourceType": "github",
+      "skillPath": "skills/arcane-testing-principles/SKILL.md",
+      "computedHash": "884eafd9f45254b4b87cb285bb24baf533df5cbc467da0ad5bb6402c46fafe11"
+    },
+    "arcane-ts": {
+      "source": "sketch7/arcane.archives",
+      "sourceType": "github",
+      "skillPath": "skills/arcane-ts/SKILL.md",
+      "computedHash": "102b7e38966861f48f369ebd55f6ac9fc9b30b6eb61d21a96044458498e5d931"
+    }
+  }
+}
